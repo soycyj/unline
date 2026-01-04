@@ -1,5 +1,11 @@
 import http from "http";
 import { WebSocketServer } from "ws";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.REDIS_URL,
+});
+
 
 const PORT = Number(process.env.PORT || 8080);
 
