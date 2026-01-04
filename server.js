@@ -7,7 +7,7 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-const ROOM_TTL_SECONDS = 60;
+const ROOM_TTL_SECONDS = 60 * 60 * 24;
 
 function roomKey(roomCode) {
   return `room:${roomCode}`;
