@@ -10,6 +10,7 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "ws": "^8.17.0"
+    "ws": "^8.17.0",
+    "@upstash/redis": "^1.30.0"
   }
 }
