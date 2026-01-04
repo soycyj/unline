@@ -6,6 +6,15 @@ const redis = new Redis({
   url: process.env.REDIS_URL,
 });
 
+const ROOM_TTL_SECONDS = 60 * 60 * 24;
+
+function roomKey(roomCode) {
+  return `room:${roomCode}`;
+}
+
+async function touchRoom(roomCode) {
+  await redis.expire(roomKey(roomCode), ROOM_TTL_SECONDS);
+}
 
 const PORT = Number(process.env.PORT || 8080);
 
@@ -120,7 +129,7 @@ wss.on("connection", (ws) => {
   ws._roomCode = "";
   ws._joined = false;
 
-  ws.on("message", (data) => {
+  ws.on("message", async (data) => {
     if (!allowEvent(ws)) {
       try { ws.close(1008, "rate limited"); } catch {}
       return;
@@ -149,7 +158,14 @@ wss.on("connection", (ws) => {
       const room = getRoom(roomCode);
       room.clients.add(ws);
 
+      const saved = await redis.get(roomKey(roomCode));
+        if (Array.isArray(saved)) {
+         room.strokes = saved;
+        }
+
       wsSend(ws, { type: "init", roomCode, strokes: room.strokes });
+
+        await touchRoom(roomCode);
 
       broadcastPresence(roomCode, "join");
       broadcastStatus(roomCode);
@@ -166,9 +182,12 @@ wss.on("connection", (ws) => {
       if (!stroke) return;
 
       room.strokes.push(stroke);
+
       if (room.strokes.length > MAX_ROOM_STROKES) {
         room.strokes.splice(0, room.strokes.length - MAX_ROOM_STROKES);
       }
+
+        await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
 
       broadcast(roomCode, { type: "stroke", roomCode, stroke });
       return;
