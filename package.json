@@ -1,16 +1,15 @@
 {
-  "name": "unline-server",
+  "name": "unline-ws-server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "ws": "^8.18.3"
+    "ws": "^8.17.0"
   }
 }
