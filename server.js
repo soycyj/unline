@@ -162,6 +162,8 @@ wss.on("connection", (ws) => {
       const saved = await redis.get(roomKey(roomCode));
         if (Array.isArray(saved)) {
          room.strokes = saved;
+         } else {
+            room.strokes = [];
         }
 
       wsSend(ws, { type: "init", roomCode, strokes: room.strokes });
