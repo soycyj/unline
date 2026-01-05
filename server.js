@@ -220,6 +220,7 @@ wss.on("connection", (ws, req) => {
       if (ws._joined) return;
 
       const room = getRoom(roomCode);
+      const wasActive = room.clients.size > 0; // 중요: ws 추가 전 상태
 
       if (room.clients.size >= MAX_CLIENTS_PER_ROOM) {
         wsSend(ws, { type: "warn", reason: "room full" });
@@ -228,32 +229,27 @@ wss.on("connection", (ws, req) => {
 
       ws._joined = true;
       ws._roomCode = roomCode;
-
       room.clients.add(ws);
 
       const saved = await redis.get(roomKey(roomCode));
 
-      if (Array.isArray(saved)) {
-        room.strokes = saved;
+      if (!wasActive) {
+        // 아무도 없던 방이면 Redis를 기준으로 복원
+        if (Array.isArray(saved)) room.strokes = saved;
+        else room.strokes = [];
       } else {
-        /* 중요
-           Redis에 데이터가 없을 때
-           방이 비어있던 경우에만 초기화
-           이미 누가 그리는 중이면 메모리 유지
-        */
-        if (room.clients.size === 1) {
-          room.strokes = [];
+        // 이미 누가 그리고 있는 방이면 Redis로 덮어쓰지 않음
+        // 단, 메모리가 비어있는데 Redis에만 있으면 복원
+        if (room.strokes.length === 0 && Array.isArray(saved)) {
+          room.strokes = saved;
         }
+        // 추가로 안전하게: Redis가 더 길면만 업데이트하고 싶으면 아래 옵션
+        // if (Array.isArray(saved) && saved.length > room.strokes.length) room.strokes = saved;
       }
 
-      console.log("join init", {
-        roomCode,
-        saved: Array.isArray(saved),
-        len: room.strokes.length,
-      });
+
 
       wsSend(ws, { type: "init", roomCode, strokes: room.strokes });
-
       await touchRoom(roomCode);
 
       broadcast(roomCode, { type: "presence", roomCode, event: "join" });
