@@ -1,10 +1,12 @@
+// server.js
+// This is your current architecture using ws and Upstash Redis.
+// I am providing a complete version that matches the protocol used by the canvas.html above.
+
 import http from "http";
 import { WebSocketServer } from "ws";
 import { Redis } from "@upstash/redis";
 
-/* =========================
-   Config
-========================= */
+/* Config */
 
 const PORT = Number(process.env.PORT || 8080);
 
@@ -14,25 +16,18 @@ const redis = new Redis({
 });
 
 const ROOM_TTL_SECONDS = 60 * 60 * 24;
-
 const MAX_ROOM_STROKES = 5000;
-
-/* 길게 그을 때 메시지가 커질 수 있어서 넉넉히 올림 */
 const MAX_MSG_BYTES = 256 * 1024;
 
 const ROOM_CODE_RE = /^[A-Z0-9]{4,8}$/;
 
-/* 악성 트래픽 방어 기본값 */
 const MAX_CONN_PER_IP = 20;
 const MAX_CLIENTS_PER_ROOM = 30;
 
-/* 그리기 이벤트는 매우 자주 발생하므로 값 크게 설정 */
 const WINDOW_MS = 5000;
 const MAX_EVENTS_PER_5S_PER_IP = 2000;
 
-/* =========================
-   Helpers
-========================= */
+/* Helpers */
 
 function now() {
   return Date.now();
@@ -75,7 +70,8 @@ function getIP(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
-/* IP 상태 */
+/* IP state */
+
 const ipState = new Map();
 
 function getIpState(ip) {
@@ -100,9 +96,7 @@ function allowIpEvent(ip) {
   return s.count <= MAX_EVENTS_PER_5S_PER_IP;
 }
 
-/* =========================
-   Rooms in memory
-========================= */
+/* Rooms in memory */
 
 const rooms = new Map();
 
@@ -125,9 +119,7 @@ function broadcastPeople(roomCode) {
   broadcast(roomCode, { type: "status", roomCode, count });
 }
 
-/* =========================
-   Server
-========================= */
+/* Server */
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
@@ -147,9 +139,7 @@ wss.on("connection", (ws, req) => {
 
   if (st.conns > MAX_CONN_PER_IP) {
     st.conns = Math.max(0, st.conns - 1);
-    try {
-      ws.close(1008, "too many connections");
-    } catch {}
+    try { ws.close(1008, "too many connections"); } catch {}
     return;
   }
 
@@ -161,13 +151,6 @@ wss.on("connection", (ws, req) => {
       const room = rooms.get(ws._roomCode);
       if (room) {
         room.clients.delete(ws);
-
-        broadcast(ws._roomCode, {
-          type: "presence",
-          roomCode: ws._roomCode,
-          event: "leave",
-        });
-
         broadcastPeople(ws._roomCode);
 
         if (room.clients.size === 0) {
@@ -181,18 +164,12 @@ wss.on("connection", (ws, req) => {
     const ipNow = ws._ip || "unknown";
     const msgBytes = bytesOf(data);
 
-    /* 너무 큰 메시지는 연결을 끊지 말고 무시 */
     if (msgBytes > MAX_MSG_BYTES) {
-      console.log("drop message too big", { ip: ipNow, bytes: msgBytes });
       wsSend(ws, { type: "warn", reason: "message too big" });
       return;
     }
 
-    /* 레이트 초과도 연결을 끊지 말고 무시 */
-    if (!allowIpEvent(ipNow)) {
-      console.log("drop rate limited", { ip: ipNow });
-      return;
-    }
+    if (!allowIpEvent(ipNow)) return;
 
     const raw = typeof data === "string" ? data : data.toString("utf8");
     const msg = safeJsonParse(raw);
@@ -201,26 +178,21 @@ wss.on("connection", (ws, req) => {
     const type = String(msg.type || "");
     const roomCode = normalizeRoom(msg.roomCode || ws._roomCode);
 
-    /* ping pong */
     if (type === "ping") {
       wsSend(ws, { type: "pong" });
       return;
     }
 
-    /* roomCode 검증 */
     if (!ROOM_CODE_RE.test(roomCode)) {
       wsSend(ws, { type: "warn", reason: "invalid room" });
       return;
     }
 
-    console.log("msg", { type, roomCode, bytes: msgBytes, ip: ipNow });
-
-    /* join */
     if (type === "join") {
       if (ws._joined) return;
 
       const room = getRoom(roomCode);
-      const wasActive = room.clients.size > 0; // 중요: ws 추가 전 상태
+      const wasActive = room.clients.size > 0;
 
       if (room.clients.size >= MAX_CLIENTS_PER_ROOM) {
         wsSend(ws, { type: "warn", reason: "room full" });
@@ -234,37 +206,25 @@ wss.on("connection", (ws, req) => {
       const saved = await redis.get(roomKey(roomCode));
 
       if (!wasActive) {
-        // 아무도 없던 방이면 Redis를 기준으로 복원
-        if (Array.isArray(saved)) room.strokes = saved;
-        else room.strokes = [];
+        room.strokes = Array.isArray(saved) ? saved : [];
       } else {
-        // 이미 누가 그리고 있는 방이면 Redis로 덮어쓰지 않음
-        // 단, 메모리가 비어있는데 Redis에만 있으면 복원
         if (room.strokes.length === 0 && Array.isArray(saved)) {
           room.strokes = saved;
         }
-        // 추가로 안전하게: Redis가 더 길면만 업데이트하고 싶으면 아래 옵션
-        // if (Array.isArray(saved) && saved.length > room.strokes.length) room.strokes = saved;
       }
-
-
 
       wsSend(ws, { type: "init", roomCode, strokes: room.strokes });
       await touchRoom(roomCode);
 
-      broadcast(roomCode, { type: "presence", roomCode, event: "join" });
       broadcastPeople(roomCode);
-
       return;
     }
 
-    /* join 필수 */
     if (!ws._joined || !ws._roomCode) {
       wsSend(ws, { type: "warn", reason: "join required" });
       return;
     }
 
-    /* 방 불일치 방지 */
     if (roomCode !== ws._roomCode) {
       wsSend(ws, { type: "warn", reason: "room mismatch" });
       return;
@@ -272,7 +232,6 @@ wss.on("connection", (ws, req) => {
 
     const room = getRoom(roomCode);
 
-    /* stroke */
     if (type === "stroke") {
       const stroke = msg.stroke;
       if (!stroke || typeof stroke !== "object") return;
@@ -283,17 +242,13 @@ wss.on("connection", (ws, req) => {
         room.strokes.splice(0, room.strokes.length - MAX_ROOM_STROKES);
       }
 
-      /* 저장 */
       await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
 
       broadcast(roomCode, { type: "stroke", roomCode, stroke });
       return;
     }
 
-    /* clear */
     if (type === "clear") {
-      console.log("clear", { roomCode, ip: ipNow });
-
       room.strokes = [];
       await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
 
