@@ -225,7 +225,9 @@ wss.on("connection", (ws, req) => {
       if (Array.isArray(saved)) {
         room.strokes = saved;
       } else {
-        room.strokes = [];
+        // 이미 누가 그리는 중이면 메모리를 진짜 상태로 보고 유지
+        // 아무도 없던 방이면 빈 배열로 초기화
+        if (room.clients.size === 0) room.strokes = [];
       }
 
       wsSend(ws, { type: "init", roomCode, strokes: room.strokes });
