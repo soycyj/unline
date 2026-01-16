@@ -19,25 +19,14 @@ const wss = new WebSocketServer({ server, path: "/ws" });
 
 const rooms = new Map();
 
-// teacher matchmaking state
-// teachers teacherId -> { status waiting|matched, matchedRoom, teacherUrl, updatedAt }
-const teachers = new Map();
-// queue holds teacherIds
-const teacherQueue = [];
+// teachers and queue
+const teachers = new Map(); // teacherId -> { status: waiting|matched, teacherUrl, updatedAt }
+const teacherQueue = []; // FIFO
 
 function now() { return Date.now(); }
-
-function genId(prefix) {
-  return prefix + Math.random().toString(16).slice(2, 10);
-}
-
-function genRoomCode() {
-  return Math.random().toString(36).slice(2, 6).toUpperCase();
-}
-
-function getBase(req) {
-  return req.protocol + "://" + req.get("host");
-}
+function genId(prefix) { return prefix + Math.random().toString(16).slice(2, 10); }
+function genRoomCode() { return Math.random().toString(36).slice(2, 6).toUpperCase(); }
+function getBase(req) { return req.protocol + "://" + req.get("host"); }
 
 function getRoom(room) {
   if (!rooms.has(room)) {
@@ -45,13 +34,16 @@ function getRoom(room) {
       sockets: new Set(),
       clientIdBySocket: new Map(),
       roleByClientId: new Map(),
+      session: null, // { sessionId, mode: "trial"|"learning", trialEndsAt, teacherId, createdAt, learningStartedAt }
     });
   }
   return rooms.get(room);
 }
 
 function safeSend(ws, obj) {
-  try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); } catch {}
+  try {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  } catch {}
 }
 
 function ensureRoles(roomState) {
@@ -83,11 +75,16 @@ function ensureRoles(roomState) {
 function broadcastRoomState(roomState) {
   ensureRoles(roomState);
   const visitors = roomState.sockets.size;
+
+  const sessionMode = roomState.session?.mode || null;
+  const trialEndsAt = roomState.session?.trialEndsAt || null;
+  const sessionId = roomState.session?.sessionId || null;
+
   for (const ws of roomState.sockets) {
     if (ws.readyState !== 1) continue;
     const clientId = roomState.clientIdBySocket.get(ws);
     const role = roomState.roleByClientId.get(clientId) || "Viewer";
-    safeSend(ws, { type: "room_state", visitors, role });
+    safeSend(ws, { type: "room_state", visitors, role, sessionMode, trialEndsAt, sessionId });
   }
 }
 
@@ -104,12 +101,7 @@ app.post("/api/teacher/online", (req, res) => {
 
   const t = teachers.get(teacherId);
   if (!t || t.status !== "waiting") {
-    teachers.set(teacherId, {
-      status: "waiting",
-      matchedRoom: null,
-      teacherUrl: null,
-      updatedAt: now(),
-    });
+    teachers.set(teacherId, { status: "waiting", teacherUrl: null, updatedAt: now() });
     teacherQueue.push(teacherId);
   }
   return res.json({ ok: true });
@@ -123,23 +115,7 @@ app.post("/api/teacher/offline", (req, res) => {
   return res.json({ ok: true });
 });
 
-// teacher polls for match result
-app.post("/api/teacher/poll", (req, res) => {
-  const teacherId = String(req.body?.teacherId || "").trim();
-  if (!teacherId) return res.status(400).json({ ok: false, error: "missing teacherId" });
-
-  const t = teachers.get(teacherId);
-  if (!t) return res.json({ ok: true, status: "offline" });
-
-  return res.json({
-    ok: true,
-    status: t.status,
-    matchedRoom: t.matchedRoom,
-    teacherUrl: t.teacherUrl,
-  });
-});
-
-// student requests match
+// student match
 app.post("/api/match", (req, res) => {
   let picked = null;
   while (teacherQueue.length) {
@@ -150,44 +126,83 @@ app.post("/api/match", (req, res) => {
       break;
     }
   }
-
   if (!picked) return res.json({ ok: false, reason: "no_teacher_available" });
 
   const base = getBase(req);
   const room = genRoomCode();
+  const sessionId = genId("sess_");
+  const trialEndsAt = now() + 10 * 60 * 1000;
+
   const teacherClientId = genId("t");
   const studentClientId = genId("s");
 
-  const teacherUrl = `${base}/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(teacherClientId)}&label=${encodeURIComponent("Teacher")}&teacherId=${encodeURIComponent(picked)}`;
-  const studentUrl = `${base}/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(studentClientId)}&label=${encodeURIComponent("Student")}`;
+  const teacherUrl =
+    `${base}/canvas.html?room=${encodeURIComponent(room)}` +
+    `&clientId=${encodeURIComponent(teacherClientId)}` +
+    `&label=${encodeURIComponent("Teacher")}` +
+    `&teacherId=${encodeURIComponent(picked)}` +
+    `&sessionId=${encodeURIComponent(sessionId)}`;
 
-  teachers.set(picked, {
-    status: "matched",
-    matchedRoom: room,
-    teacherUrl,
-    updatedAt: now(),
-  });
+  const studentUrl =
+    `${base}/canvas.html?room=${encodeURIComponent(room)}` +
+    `&clientId=${encodeURIComponent(studentClientId)}` +
+    `&label=${encodeURIComponent("Student")}` +
+    `&sessionId=${encodeURIComponent(sessionId)}`;
 
-  return res.json({ ok: true, room, teacherUrl, studentUrl });
+  teachers.set(picked, { status: "matched", teacherUrl, updatedAt: now() });
+
+  // create room + session meta
+  const roomState = getRoom(room);
+  roomState.session = {
+    sessionId,
+    mode: "trial",
+    trialEndsAt,
+    teacherId: picked,
+    createdAt: now(),
+    learningStartedAt: null,
+  };
+
+  return res.json({ ok: true, room, sessionId, trialEndsAt, teacherUrl, studentUrl });
 });
 
-// end session and put teacher back online
-app.post("/api/session/end", (req, res) => {
-  const teacherId = String(req.body?.teacherId || "").trim();
-  if (!teacherId) return res.status(400).json({ ok: false, error: "missing teacherId" });
+// student decision after trial
+// decision: continue | retry | end
+app.post("/api/session/decision", (req, res) => {
+  const room = String(req.body?.room || "").trim();
+  const sessionId = String(req.body?.sessionId || "").trim();
+  const decision = String(req.body?.decision || "").trim();
 
-  teachers.set(teacherId, {
-    status: "waiting",
-    matchedRoom: null,
-    teacherUrl: null,
-    updatedAt: now(),
-  });
-  teacherQueue.push(teacherId);
+  if (!room || !sessionId || !decision) {
+    return res.status(400).json({ ok: false, error: "missing fields" });
+  }
 
-  return res.json({ ok: true });
+  const roomState = rooms.get(room);
+  if (!roomState || !roomState.session || roomState.session.sessionId !== sessionId) {
+    return res.status(404).json({ ok: false, error: "session not found" });
+  }
+
+  const teacherId = roomState.session.teacherId;
+
+  if (decision === "continue") {
+    roomState.session.mode = "learning";
+    roomState.session.trialEndsAt = null;
+    roomState.session.learningStartedAt = now();
+    broadcastRoomState(roomState);
+    return res.json({ ok: true, mode: "learning" });
+  }
+
+  // retry or end: teacher goes back to waiting, room session ends
+  if (teacherId) {
+    teachers.set(teacherId, { status: "waiting", teacherUrl: null, updatedAt: now() });
+    teacherQueue.push(teacherId);
+  }
+
+  roomState.session = null;
+  broadcastRoomState(roomState);
+
+  return res.json({ ok: true, mode: "ended" });
 });
 
-// websocket
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url, "http://localhost");
   const room = (url.searchParams.get("room") || "").trim() || "ROOM";
@@ -195,6 +210,7 @@ wss.on("connection", (ws, req) => {
 
   const roomState = getRoom(room);
 
+  // reclaim
   for (const [sock, id] of roomState.clientIdBySocket.entries()) {
     if (id === clientId && sock !== ws) {
       try { sock.close(4001, "reclaimed"); } catch {}
