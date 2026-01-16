@@ -254,6 +254,7 @@
     }
 
     const qs = new URLSearchParams(location.search);
+    const teacherId = (qs.get("teacherId") || "").trim();
     let room = (qs.get("room") || "").trim();
     if(!room) room = "TEST";
 
@@ -387,6 +388,22 @@
     });
 
     $("backBtn").addEventListener("click", () => { location.href = "/"; });
+    if(teacherId){
+  const btn = document.getElementById("endSessionBtn");
+  btn.style.display = "inline-block";
+  btn.addEventListener("click", async () => {
+    const ok = confirm("수업을 종료하고 다시 대기 상태로 돌아갈까요?");
+    if(!ok) return;
+
+    await fetch("/api/session/end", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ teacherId })
+    });
+
+    location.href = "/";
+  });
+}
 
     // tools
     const swatchColors = [
