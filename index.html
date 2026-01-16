@@ -16,14 +16,31 @@
       height:100vh;
     }
     .card{
-      width:min(520px, 92vw);
+      width:min(720px, 92vw);
       border:1px solid #273044;
       border-radius:16px;
       padding:18px;
       background:rgba(20,24,33,0.9);
     }
-    h1{margin:0 0 10px;font-size:20px}
-    p{margin:0 0 14px;color:#a9b4c7;font-size:13px;line-height:1.5}
+    h1{margin:0 0 12px;font-size:20px}
+    p{margin:0 0 14px;color:#a9b4c7;font-size:13px;line-height:1.6}
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width:820px){ .grid{grid-template-columns:1fr} }
+    .box{
+      border:1px solid #273044;
+      border-radius:14px;
+      padding:14px;
+      background:rgba(10,12,16,0.35);
+    }
+    .box h2{
+      margin:0 0 10px;
+      font-size:14px;
+      color:#e8eef9;
+    }
     input{
       width:100%;
       padding:12px 12px;
@@ -33,6 +50,7 @@
       color:#e8eef9;
       font-size:14px;
       outline:none;
+      margin-top:10px;
     }
     .row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
     button{
@@ -42,43 +60,74 @@
       background:#2b3242;
       color:#e8eef9;
       cursor:pointer;
-      font-weight:700;
+      font-weight:800;
       font-size:13px;
     }
     button.primary{background:#1f6feb;border-color:rgba(31,111,235,0.7)}
-    .small{margin-top:12px;color:#a9b4c7;font-size:12px;line-height:1.5}
-    code{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New";font-size:12px}
+    button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
+    .small{
+      margin-top:10px;
+      color:#a9b4c7;
+      font-size:12px;
+      line-height:1.6
+    }
+    .mono{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New";
+      font-size:12px;
+      word-break:break-all;
+      background:rgba(10,12,16,0.6);
+      border:1px solid #273044;
+      padding:10px;
+      border-radius:12px;
+      margin-top:10px;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>Unline</h1>
-    <p>room code만 입력해도 입장 가능합니다. voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다.</p>
+    <p>기본 입장은 room code로 바로 가능. 참가자만 드로잉과 음성 가능. 학생 선생 매칭은 아래에서 시작.</p>
 
-    <input id="room" placeholder="Room code" autocomplete="off" />
+    <div class="grid">
+      <div class="box">
+        <h2>Room 입장</h2>
+        <div class="small">Viewer로 입장 후 필요하면 참가자 모드로 다시 입장</div>
+        <input id="room" placeholder="Room code" autocomplete="off" />
+        <div class="row">
+          <button id="joinViewer">Join as viewer</button>
+          <button class="primary" id="joinParticipant">Join as participant</button>
+        </div>
+      </div>
 
-    <div class="row">
-      <button id="joinViewer">Join as viewer</button>
-      <button class="primary" id="joinParticipant">Join as participant</button>
+      <div class="box">
+        <h2>학생 선생 매칭</h2>
+        <div class="small">선생은 온라인 대기. 학생은 매칭 요청. 매칭되면 room이 자동 생성</div>
+        <div class="row">
+          <button class="primary" id="teacherOnline">Teacher go online</button>
+          <button class="danger" id="teacherOffline" disabled>Teacher go offline</button>
+          <button id="studentMatch">Student find teacher</button>
+        </div>
+        <div class="small" id="matchStatus">Idle</div>
+        <div class="mono" id="matchInfo" style="display:none"></div>
+      </div>
     </div>
-
-    <div class="small" id="hint"></div>
   </div>
 
   <script>
     const roomEl = document.getElementById("room");
-    const hint = document.getElementById("hint");
+    const matchStatus = document.getElementById("matchStatus");
+    const matchInfo = document.getElementById("matchInfo");
 
-    function genClientId(){
-      return "c" + Math.random().toString(16).slice(2,10);
-    }
-
-    function go(url){
-      location.href = url;
+    function genId(prefix){
+      return prefix + Math.random().toString(16).slice(2,10);
     }
 
     function getRoom(){
       return (roomEl.value || "").trim();
+    }
+
+    function go(url){
+      location.href = url;
     }
 
     document.getElementById("joinViewer").addEventListener("click", () => {
@@ -90,16 +139,77 @@
     document.getElementById("joinParticipant").addEventListener("click", () => {
       const room = getRoom();
       if(!room){ alert("room code를 입력해 주세요"); return; }
-
       const key = `unline_participant_clientId_${room}`;
       const stored = localStorage.getItem(key);
-      const clientId = stored || genClientId();
+      const clientId = stored || genId("p");
       localStorage.setItem(key, clientId);
-
-      go(`/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}`);
+      go(`/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}&label=${encodeURIComponent("Participant")}`);
     });
 
-    hint.textContent = "참가자 링크는 room별로 clientId를 저장합니다. 새로고침해도 같은 참가자로 유지됩니다.";
+    // teacher online
+    let teacherId = localStorage.getItem("unline_teacherId");
+    if(!teacherId){
+      teacherId = genId("teacher");
+      localStorage.setItem("unline_teacherId", teacherId);
+    }
+
+    async function postJson(url, body){
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+      return await res.json();
+    }
+
+    const btnOnline = document.getElementById("teacherOnline");
+    const btnOffline = document.getElementById("teacherOffline");
+
+    btnOnline.addEventListener("click", async () => {
+      matchStatus.textContent = "Teacher online";
+      const out = await postJson("/api/teacher/online", { teacherId });
+      if(!out.ok){
+        matchStatus.textContent = "Teacher online failed";
+        return;
+      }
+      btnOnline.disabled = true;
+      btnOffline.disabled = false;
+      matchInfo.style.display = "block";
+      matchInfo.textContent = "Teacher is waiting. Keep this tab open.";
+    });
+
+    btnOffline.addEventListener("click", async () => {
+      matchStatus.textContent = "Teacher offline";
+      await postJson("/api/teacher/offline", { teacherId });
+      btnOnline.disabled = false;
+      btnOffline.disabled = true;
+      matchInfo.style.display = "none";
+      matchInfo.textContent = "";
+    });
+
+    // student match
+    document.getElementById("studentMatch").addEventListener("click", async () => {
+      matchStatus.textContent = "Searching teacher";
+      matchInfo.style.display = "none";
+      matchInfo.textContent = "";
+
+      const out = await postJson("/api/match", {});
+      if(!out.ok){
+        matchStatus.textContent = "No teacher available";
+        alert("현재 대기 중인 선생이 없습니다");
+        return;
+      }
+
+      matchStatus.textContent = "Matched";
+      matchInfo.style.display = "block";
+      matchInfo.textContent =
+        "Room " + out.room + "\n\n" +
+        "Teacher link\n" + out.teacherUrl + "\n\n" +
+        "Student link\n" + out.studentUrl;
+
+      // student goes to student link immediately
+      go(out.studentUrl);
+    });
   </script>
 </body>
 </html>
