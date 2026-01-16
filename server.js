@@ -8,90 +8,86 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// repo 루트의 정적 파일을 그대로 서비스
 app.use(express.static(__dirname));
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
 
+// 루트 접속 시 index.html 반환
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+// 헬스 체크
+app.get("/health", (req, res) => res.status(200).send("ok"));
+
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server, path: "/ws" });
+
+// 룸 상태 메모리
 const rooms = new Map();
-// rooms.get(room) shape
-// {
-//   sockets: Set<WebSocket>
-//   clientIdBySocket: Map<WebSocket, string>
-//   roleByClientId: Map<string, "Participant" | "Visitor">
-// }
 
-function getRoom(room){
-  if(!rooms.has(room)){
+function getRoom(room) {
+  if (!rooms.has(room)) {
     rooms.set(room, {
       sockets: new Set(),
       clientIdBySocket: new Map(),
-      roleByClientId: new Map()
+      roleByClientId: new Map(),
     });
   }
   return rooms.get(room);
 }
 
-function countVisitors(roomState){
-  return roomState.sockets.size;
+function safeSend(ws, obj) {
+  try {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  } catch {}
 }
 
-function ensureRoles(roomState){
-  // Participant 최대 2명 유지
+function ensureRoles(roomState) {
   const entries = Array.from(roomState.roleByClientId.entries());
-
   const participants = entries.filter(([, r]) => r === "Participant").map(([id]) => id);
-  if(participants.length > 2){
-    // 초과분 Visitor로 내림
-    for(let i = 2; i < participants.length; i++){
+
+  if (participants.length > 2) {
+    for (let i = 2; i < participants.length; i++) {
       roomState.roleByClientId.set(participants[i], "Visitor");
     }
   }
 
-  const currentParticipants = Array.from(roomState.roleByClientId.values()).filter(r => r === "Participant").length;
-  if(currentParticipants < 2){
-    // 빈 자리를 Visitor에서 승격
-    const ids = Array.from(roomState.roleByClientId.keys());
-    for(const id of ids){
-      if(roomState.roleByClientId.get(id) !== "Participant"){
+  let count = Array.from(roomState.roleByClientId.values()).filter(r => r === "Participant").length;
+  if (count < 2) {
+    for (const id of roomState.roleByClientId.keys()) {
+      if (roomState.roleByClientId.get(id) !== "Participant") {
         roomState.roleByClientId.set(id, "Participant");
-        const now = Array.from(roomState.roleByClientId.values()).filter(r => r === "Participant").length;
-        if(now >= 2) break;
+        count++;
+        if (count >= 2) break;
       }
     }
   }
 }
 
-function broadcastRoomState(roomState){
+function broadcastRoomState(roomState) {
   ensureRoles(roomState);
-  const visitors = countVisitors(roomState);
+  const visitors = roomState.sockets.size;
 
-  for(const ws of roomState.sockets){
-    if(ws.readyState !== 1) continue;
+  for (const ws of roomState.sockets) {
+    if (ws.readyState !== 1) continue;
     const clientId = roomState.clientIdBySocket.get(ws);
     const role = roomState.roleByClientId.get(clientId) || "Visitor";
-    ws.send(JSON.stringify({ type: "room_state", visitors, role }));
+    safeSend(ws, { type: "room_state", visitors, role });
   }
 }
-
-function safeSend(ws, obj){
-  try{
-    if(ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
-  }catch(e){}
-}
-
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: "/ws" });
 
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url, "http://localhost");
   const room = (url.searchParams.get("room") || "").trim() || "ROOM";
-  const clientId = (url.searchParams.get("clientId") || "").trim() || ("c" + Math.random().toString(16).slice(2,10));
+  const clientId = (url.searchParams.get("clientId") || "").trim() || ("c" + Math.random().toString(16).slice(2, 10));
 
   const roomState = getRoom(room);
 
-  // 같은 clientId 재접속이면 기존 소켓들 정리
-  for(const [sock, id] of roomState.clientIdBySocket.entries()){
-    if(id === clientId && sock !== ws){
-      try{ sock.close(4001, "reclaimed"); }catch(e){}
+  // 같은 clientId 재접속이면 기존 소켓 회수
+  for (const [sock, id] of roomState.clientIdBySocket.entries()) {
+    if (id === clientId && sock !== ws) {
+      try { sock.close(4001, "reclaimed"); } catch {}
       roomState.sockets.delete(sock);
       roomState.clientIdBySocket.delete(sock);
     }
@@ -100,7 +96,7 @@ wss.on("connection", (ws, req) => {
   roomState.sockets.add(ws);
   roomState.clientIdBySocket.set(ws, clientId);
 
-  if(!roomState.roleByClientId.has(clientId)){
+  if (!roomState.roleByClientId.has(clientId)) {
     roomState.roleByClientId.set(clientId, "Visitor");
   }
 
@@ -108,29 +104,30 @@ wss.on("connection", (ws, req) => {
 
   ws.on("message", (raw) => {
     let msg;
-    try{ msg = JSON.parse(raw.toString("utf8")); }catch(e){ return; }
+    try { msg = JSON.parse(raw.toString("utf8")); } catch { return; }
 
     const type = msg.type || "";
 
-    if(type === "hello"){
+    if (type === "hello") {
       broadcastRoomState(roomState);
       return;
     }
 
-    if(type === "draw" || type === "clear"){
-      for(const s of roomState.sockets){
-        if(s !== ws) safeSend(s, msg);
+    if (type === "draw" || type === "clear") {
+      for (const s of roomState.sockets) {
+        if (s !== ws) safeSend(s, msg);
       }
       return;
     }
 
     const voiceTypes = new Set([
-      "voice_request","voice_accept","voice_reject","voice_offer","voice_answer","voice_ice","voice_stop"
+      "voice_request", "voice_accept", "voice_reject",
+      "voice_offer", "voice_answer", "voice_ice", "voice_stop"
     ]);
 
-    if(voiceTypes.has(type)){
-      for(const s of roomState.sockets){
-        if(s !== ws) safeSend(s, msg);
+    if (voiceTypes.has(type)) {
+      for (const s of roomState.sockets) {
+        if (s !== ws) safeSend(s, msg);
       }
       return;
     }
@@ -140,20 +137,17 @@ wss.on("connection", (ws, req) => {
     roomState.sockets.delete(ws);
     roomState.clientIdBySocket.delete(ws);
 
-    // 남아있는 소켓이 없는 clientId는 roleByClientId에서도 제거
     const stillAliveIds = new Set(Array.from(roomState.clientIdBySocket.values()));
-    for(const id of Array.from(roomState.roleByClientId.keys())){
-      if(!stillAliveIds.has(id)) roomState.roleByClientId.delete(id);
+    for (const id of Array.from(roomState.roleByClientId.keys())) {
+      if (!stillAliveIds.has(id)) roomState.roleByClientId.delete(id);
     }
 
-    if(roomState.sockets.size === 0){
-      rooms.delete(room);
-      return;
-    }
-
-    broadcastRoomState(roomState);
+    if (roomState.sockets.size === 0) rooms.delete(room);
+    else broadcastRoomState(roomState);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("Listening on", PORT));
+server.listen(PORT, () => {
+  console.log("Listening on", PORT);
+});
