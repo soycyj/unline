@@ -51,13 +51,13 @@
       font-size:12px;
       color:var(--muted);
     }
-    .pill strong{color:var(--text);font-weight:700}
+    .pill strong{color:var(--text);font-weight:800}
     .status{
       padding:6px 10px;
       border-radius:999px;
       border:1px solid var(--line);
       font-size:12px;
-      font-weight:800;
+      font-weight:900;
       letter-spacing:0.2px;
     }
     .online{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
@@ -69,11 +69,13 @@
       cursor:pointer;
       color:var(--text);
       background:var(--btn2);
-      font-weight:700;
+      font-weight:800;
       font-size:13px;
     }
     button.primary{background:var(--btn);border-color:rgba(31,111,235,0.7)}
     button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
+    button.ghost{background:transparent}
+    button.active{background:rgba(31,111,235,0.18);border-color:rgba(31,111,235,0.5)}
     button:disabled{opacity:0.55;cursor:not-allowed}
     input{
       padding:9px 12px;
@@ -81,14 +83,24 @@
       border:1px solid var(--line);
       background:rgba(10,12,16,0.55);
       color:var(--text);
-      font-weight:700;
+      font-weight:800;
       font-size:13px;
       outline:none;
       width:160px;
     }
+    select{
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(10,12,16,0.55);
+      color:var(--text);
+      font-weight:800;
+      font-size:13px;
+      outline:none;
+    }
     .wrap{
       display:grid;
-      grid-template-columns:1fr 320px;
+      grid-template-columns:260px 1fr 320px;
       gap:12px;
       padding:12px;
       height:calc(100% - 56px);
@@ -107,7 +119,7 @@
       touch-action:none;
       background:rgba(10,12,16,0.55);
     }
-    .side{display:flex;flex-direction:column;gap:12px}
+    .col{display:flex;flex-direction:column;gap:12px}
     .card{
       background:var(--panel);
       border:1px solid var(--line);
@@ -118,12 +130,12 @@
       margin:0 0 10px;
       font-size:13px;
       color:var(--muted);
-      font-weight:800;
+      font-weight:900;
       letter-spacing:0.3px;
       text-transform:uppercase;
     }
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .small{font-size:12px;color:var(--muted);line-height:1.45;margin:8px 0 0}
+    .small{font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0 0}
     .swatches{display:flex;gap:8px;flex-wrap:wrap}
     .swatch{
       width:24px;height:24px;border-radius:8px;
@@ -135,17 +147,21 @@
       border-color:rgba(232,238,249,0.95);
       box-shadow:0 0 0 2px rgba(232,238,249,0.25) inset;
     }
-    select{
-      padding:9px 12px;
-      border-radius:12px;
-      border:1px solid var(--line);
-      background:rgba(10,12,16,0.55);
-      color:var(--text);
-      font-weight:700;
-      font-size:13px;
-      outline:none;
+    .banner{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(245,158,11,0.35);
+      background:rgba(245,158,11,0.10);
+      color:#fde68a;
+      font-size:12px;
+      line-height:1.55;
+      display:none;
     }
-    @media (max-width:980px){ .wrap{grid-template-columns:1fr} input{width:140px} }
+    @media (max-width:1060px){
+      .wrap{grid-template-columns:1fr}
+      input{width:140px}
+    }
   </style>
 </head>
 <body>
@@ -155,26 +171,29 @@
       <div class="pill">Room <strong id="roomTxt"></strong></div>
       <div class="pill">Role <strong id="roleTxt">Unknown</strong></div>
       <div class="pill">Visitors <strong id="visitorsTxt">0</strong></div>
+      <div class="pill">Label <strong id="labelTxt">None</strong></div>
     </div>
     <div class="right">
       <input id="roomInput" placeholder="Room code" />
       <button id="goRoomBtn">Go</button>
-      <button id="clearBtn">Clear</button>
-      <button id="backBtn">Back</button>
+      <button id="clearBtn" class="danger">Clear</button>
+      <button id="backBtn" class="ghost">Back</button>
     </div>
   </div>
 
   <div class="wrap">
-    <div class="stage">
-      <canvas id="board"></canvas>
-    </div>
-
-    <div class="side">
+    <div class="col">
       <div class="card">
-        <h3>Pen</h3>
+        <h3>Tools</h3>
         <div class="row">
+          <button id="toolPen" class="active">Pen</button>
+          <button id="toolEraser">Eraser</button>
+        </div>
+
+        <div class="row" style="margin-top:10px">
           <div class="swatches" id="swatches"></div>
         </div>
+
         <div class="row" style="margin-top:10px">
           <div class="small">Size</div>
           <select id="sizeSel">
@@ -185,9 +204,21 @@
             <option value="12">12</option>
           </select>
         </div>
-        <p class="small" id="penInfo"></p>
-      </div>
 
+        <div class="banner" id="viewerBanner">
+          Viewer 모드입니다. 현재 room에서 그리기와 음성은 참가자만 가능합니다.
+          참가자 링크로 다시 입장하면 바로 사용 가능합니다.
+        </div>
+
+        <p class="small" id="toolInfo"></p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <canvas id="board"></canvas>
+    </div>
+
+    <div class="col">
       <div class="card">
         <h3>Voice</h3>
         <div class="row">
@@ -223,7 +254,10 @@
 
     const qs = new URLSearchParams(location.search);
     let room = (qs.get("room") || "").trim();
-    if(!room){ room = "TEST"; }
+    if(!room) room = "TEST";
+
+    const label = (qs.get("label") || "").trim();
+    $("labelTxt").textContent = label || "None";
 
     const userProvidedClientId = !!(qs.get("clientId") || "").trim();
 
@@ -240,16 +274,25 @@
     let currentRole = "Unknown";
     let currentVisitors = 0;
 
-    function applyRoomState(payload){
-      if(payload && payload.role) currentRole = payload.role;
-      if(payload && typeof payload.visitors === "number") currentVisitors = payload.visitors;
-      $("roleTxt").textContent = currentRole;
-      $("visitorsTxt").textContent = String(currentVisitors);
-      updateVoiceUi();
+    function canDraw(){
+      return currentRole === "Participant";
     }
 
     function canVoice(){
       return userProvidedClientId && currentRole === "Participant";
+    }
+
+    function applyRoomState(payload){
+      if(payload && payload.role) currentRole = payload.role;
+      if(payload && typeof payload.visitors === "number") currentVisitors = payload.visitors;
+
+      $("roleTxt").textContent = currentRole;
+      $("visitorsTxt").textContent = String(currentVisitors);
+
+      $("viewerBanner").style.display = (currentRole !== "Participant") ? "block" : "none";
+
+      updateVoiceUi();
+      updateToolUi();
     }
 
     function updateVoiceUi(){
@@ -290,6 +333,7 @@
         currentRole = "Unknown";
         $("roleTxt").textContent = currentRole;
         updateVoiceUi();
+        updateToolUi();
       });
 
       ws.addEventListener("error", () => {
@@ -329,6 +373,7 @@
       const next = new URL(location.href);
       next.searchParams.set("room", room);
       if(userProvidedClientId) next.searchParams.set("clientId", clientId);
+      if(label) next.searchParams.set("label", label);
       history.replaceState(null, "", next.toString());
 
       connect();
@@ -342,7 +387,7 @@
 
     $("backBtn").addEventListener("click", () => { location.href = "/"; });
 
-    // Pen
+    // tools
     const swatchColors = [
       "#E8EEF9",
       "#22C55E",
@@ -354,11 +399,35 @@
       "#F472B6"
     ];
 
+    let tool = "pen";
     let penColor = swatchColors[0];
     let penWidth = Number($("sizeSel").value);
 
-    function setPenInfo(){
-      $("penInfo").textContent = `color ${penColor} size ${penWidth}`;
+    function setTool(next){
+      tool = next;
+      updateToolUi();
+    }
+
+    function updateToolUi(){
+      $("toolPen").classList.toggle("active", tool === "pen");
+      $("toolEraser").classList.toggle("active", tool === "eraser");
+
+      const text =
+        "Tool " + tool.toUpperCase() +
+        "  Size " + penWidth +
+        (tool === "pen" ? "  Color " + penColor : "");
+
+      $("toolInfo").textContent = text;
+
+      const disabled = !canDraw();
+      $("toolPen").disabled = disabled;
+      $("toolEraser").disabled = disabled;
+      $("sizeSel").disabled = disabled;
+      $("clearBtn").disabled = disabled;
+
+      // color only for pen
+      const sw = $("swatches").querySelectorAll("button");
+      sw.forEach(b => b.disabled = disabled || tool !== "pen");
     }
 
     function renderSwatches(){
@@ -370,23 +439,26 @@
         b.className = "swatch" + (c === penColor ? " active" : "");
         b.style.background = c;
         b.addEventListener("click", () => {
+          if(tool !== "pen") return;
           penColor = c;
           renderSwatches();
-          setPenInfo();
+          updateToolUi();
         });
         box.appendChild(b);
       }
     }
 
+    $("toolPen").addEventListener("click", () => setTool("pen"));
+    $("toolEraser").addEventListener("click", () => setTool("eraser"));
     $("sizeSel").addEventListener("change", () => {
       penWidth = Number($("sizeSel").value);
-      setPenInfo();
+      updateToolUi();
     });
 
     renderSwatches();
-    setPenInfo();
+    updateToolUi();
 
-    // Drawing
+    // drawing
     const canvas = $("board");
     const ctx = canvas.getContext("2d");
     let drawing = false;
@@ -409,20 +481,32 @@
       return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
     }
 
-    function stroke(a, b, color, w){
-      ctx.strokeStyle = color;
+    function stroke(a, b, payload){
+      const mode = payload.mode || "pen";
+      const w = Number(payload.w || 3);
+      const color = payload.color || "#E8EEF9";
+
+      const prev = ctx.globalCompositeOperation;
+      if(mode === "eraser"){
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = color;
+      }
       ctx.lineWidth = w;
+
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
+
+      ctx.globalCompositeOperation = prev;
     }
 
     function applyRemoteStroke(msg){
       if(!msg || !msg.a || !msg.b) return;
-      const color = msg.color || "#E8EEF9";
-      const w = Number(msg.w || 3);
-      stroke(msg.a, msg.b, color, w);
+      stroke(msg.a, msg.b, msg);
     }
 
     function clearCanvas(broadcast){
@@ -430,24 +514,49 @@
       if(broadcast) send("clear", {});
     }
 
-    function start(e){ drawing = true; last = posFromEvent(e); }
+    function start(e){
+      if(!canDraw()) return;
+      drawing = true;
+      last = posFromEvent(e);
+    }
+
     function move(e){
       if(!drawing) return;
       const p = posFromEvent(e);
-      stroke(last, p, penColor, penWidth);
-      send("draw", { a:last, b:p, color: penColor, w: penWidth });
+
+      const payload = {
+        mode: tool,
+        color: penColor,
+        w: penWidth,
+      };
+
+      stroke(last, p, payload);
+      send("draw", { a:last, b:p, ...payload });
+
       last = p;
     }
-    function end(){ drawing = false; last = null; }
 
-    canvas.addEventListener("pointerdown", (e) => { canvas.setPointerCapture(e.pointerId); start(e); });
+    function end(){
+      drawing = false;
+      last = null;
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      start(e);
+    });
     canvas.addEventListener("pointermove", move);
     canvas.addEventListener("pointerup", end);
     canvas.addEventListener("pointercancel", end);
 
-    $("clearBtn").addEventListener("click", () => { clearCanvas(true); });
+    $("clearBtn").addEventListener("click", () => {
+      if(!canDraw()) return;
+      const ok = confirm("전체를 지울까요");
+      if(!ok) return;
+      clearCanvas(true);
+    });
 
-    // Voice WebRTC
+    // voice
     let pc = null;
     let localStream = null;
     let callActive = false;
