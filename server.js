@@ -1,546 +1,767 @@
-import http from "http";
-import { WebSocketServer } from "ws";
-import { Redis } from "@upstash/redis";
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Unline Canvas</title>
+  <style>
+    :root{
+      --bg:#0b0d10;
+      --panel:rgba(20,24,33,0.88);
+      --line:rgba(39,48,68,0.9);
+      --text:#e8eef9;
+      --muted:#a9b4c7;
+      --btn:#1f6feb;
+      --btn2:#2b3242;
+      --danger:#ef4444;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans",Arial;
+      overflow:hidden;
+    }
 
-/* Config */
+    canvas#board{
+      position:fixed;
+      inset:0;
+      width:100vw;
+      height:100vh;
+      z-index:1;
+      touch-action:none;
+      background:radial-gradient(1200px 900px at 15% 0%, #13213f 0%, #0b0d10 55%);
+    }
 
-const PORT = Number(process.env.PORT || 8080);
+    .topBar{
+      position:fixed;
+      top:12px;
+      left:12px;
+      right:12px;
+      z-index:10;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      background:var(--panel);
+      backdrop-filter:blur(10px);
+      border-radius:14px;
+      box-shadow:0 16px 44px rgba(0,0,0,0.35);
+    }
+    .leftGroup{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
+    .roomCode{font-weight:900;letter-spacing:1px;font-size:14px;white-space:nowrap}
+    .small{font-size:12px;color:var(--muted);white-space:nowrap}
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,0.12);
+      color:var(--muted);
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .dot{
+      width:9px;height:9px;border-radius:999px;
+      background:#64748b;
+      box-shadow:0 0 0 3px rgba(100,116,139,0.15);
+    }
+    .dot.ok{
+      background:var(--ok);
+      box-shadow:0 0 0 3px rgba(34,197,94,0.18);
+    }
+    .dot.warn{
+      background:var(--warn);
+      box-shadow:0 0 0 3px rgba(245,158,11,0.18);
+    }
+    .rightGroup{display:flex;align-items:center;gap:10px}
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+    .controls{
+      position:fixed;
+      right:14px;
+      bottom:14px;
+      z-index:10;
+      display:grid;
+      gap:10px;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:var(--panel);
+      backdrop-filter:blur(10px);
+      box-shadow:0 16px 44px rgba(0,0,0,0.35);
+      min-width:240px;
+    }
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    button{
+      border:0;border-radius:12px;
+      padding:10px 12px;
+      font-weight:900;
+      cursor:pointer;
+      color:white;
+      background:var(--btn);
+      font-size:13px;
+      white-space:nowrap;
+    }
+    button.secondary{background:var(--btn2)}
+    button.danger{background:var(--danger)}
+    button:disabled{opacity:0.6;cursor:not-allowed}
 
-// Room data retention
-const ROOM_TTL_SECONDS = 60 * 60 * 24;
+    .toolBtn{flex:1;background:var(--btn2)}
+    .toolBtn.active{background:var(--btn)}
+    input[type="color"]{
+      width:44px;height:34px;
+      border:1px solid var(--line);
+      background:transparent;
+      border-radius:10px;
+      padding:0;
+      cursor:pointer;
+    }
+    input[type="range"]{width:130px}
 
-// Drawing strokes
-const MAX_ROOM_STROKES = 5000;
+    .overlay{
+      position:fixed;
+      inset:0;
+      z-index:30;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(0,0,0,0.55);
+      padding:18px;
+    }
+    .overlay.show{display:flex}
+    .modal{
+      width:min(560px, 100%);
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(20,24,33,0.95);
+      backdrop-filter:blur(10px);
+      box-shadow:0 24px 80px rgba(0,0,0,0.45);
+      padding:14px;
+    }
+    .modal h3{margin:0 0 10px;font-size:14px}
+    .modal input{
+      width:100%;
+      background:#0e1220;
+      border:1px solid var(--line);
+      color:var(--text);
+      border-radius:12px;
+      padding:12px;
+      outline:none;
+      font-size:14px;
+    }
+    .modal .hint{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.45}
+    .modal .footer{
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      margin-top:12px;
+      flex-wrap:wrap;
+    }
+    .banner{
+      position:fixed;
+      left:12px;
+      bottom:12px;
+      z-index:11;
+      max-width:min(520px, calc(100vw - 24px));
+      border:1px solid var(--line);
+      background:rgba(0,0,0,0.25);
+      backdrop-filter:blur(10px);
+      border-radius:14px;
+      padding:10px 12px;
+      color:var(--muted);
+      font-size:12px;
+      display:none;
+      box-shadow:0 16px 44px rgba(0,0,0,0.35);
+    }
+    .banner.show{display:block}
+    .banner strong{color:var(--text)}
 
-// Safety
-const MAX_MSG_BYTES = 256 * 1024;
-const ROOM_CODE_RE = /^[A-Z0-9]{4,8}$/;
+    .trialOverlay{
+      position:fixed;
+      inset:0;
+      z-index:40;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(0,0,0,0.62);
+      padding:18px;
+    }
+    .trialOverlay.show{display:flex}
+    .trialBox{
+      width:min(620px, 100%);
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(20,24,33,0.95);
+      backdrop-filter:blur(10px);
+      box-shadow:0 24px 80px rgba(0,0,0,0.45);
+      padding:16px;
+    }
+    .trialBox h3{margin:0 0 8px;font-size:15px}
+    .trialBox p{margin:0 0 12px;color:var(--muted);font-size:12px;line-height:1.45}
+    .trialBox .footer{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <canvas id="board"></canvas>
 
-const MAX_CONN_PER_IP = 20;
-const MAX_CLIENTS_PER_ROOM = 60; // participants(2) + spectators
+  <div class="topBar">
+    <div class="leftGroup">
+      <div class="roomCode" id="roomCode">ROOM</div>
 
-const WINDOW_MS = 5000;
-const MAX_EVENTS_PER_5S_PER_IP = 2000;
+      <div class="pill" title="Connected clients">
+        <span>Visitors</span>
+        <strong id="visitors">0</strong>
+      </div>
 
-// Session
-const TRIAL_SECONDS = 10 * 60;
+      <div class="pill" title="Participants and watchers">
+        <span id="roleText">Role</span>
+        <strong id="roleValue">Participant</strong>
+      </div>
 
-/* Helpers */
+      <div class="pill" title="Session status">
+        <span id="sessionText">Session</span>
+        <strong id="sessionValue">Idle</strong>
+      </div>
 
-function now() {
-  return Date.now();
-}
+      <div class="pill" title="Trial timer">
+        <span>Trial</span>
+        <strong id="trialTimer">--:--</strong>
+      </div>
 
-function safeJsonParse(str) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return null;
-  }
-}
+      <div class="pill" title="WebSocket connection">
+        <span id="sockDot" class="dot"></span>
+        <span id="sockText">Connecting</span>
+      </div>
+    </div>
 
-function normalizeRoom(code) {
-  return String(code || "").trim().toUpperCase();
-}
+    <div class="rightGroup">
+      <button id="changeBtn" class="secondary">Change room</button>
+      <button id="backBtn" class="secondary">Back</button>
+    </div>
+  </div>
 
-function roomKey(roomCode) {
-  return `room:${roomCode}:strokes`;
-}
+  <div class="controls" id="controls">
+    <div class="row">
+      <button id="penBtn" class="toolBtn active">Pen</button>
+      <button id="eraserBtn" class="toolBtn">Eraser</button>
+    </div>
+    <div class="row">
+      <span class="small">Color</span>
+      <input id="color" type="color" value="#ffffff" />
+    </div>
+    <div class="row">
+      <span class="small">Size</span>
+      <input id="size" type="range" min="2" max="30" value="6" />
+      <span class="small" id="sizeLabel">6</span>
+    </div>
+    <div class="row">
+      <button id="clearBtn" class="danger">Clear</button>
+      <button id="copyBtn" class="secondary">Copy code</button>
+    </div>
+    <div class="row">
+      <button id="startVoiceBtn" class="secondary">Start voice</button>
+    </div>
+  </div>
 
-function roomMetaKey(roomCode) {
-  return `room:${roomCode}:meta`;
-}
+  <div class="banner" id="banner">
+    <strong>Spectator mode</strong> You can watch, but cannot draw or start voice.
+  </div>
 
-async function touchRoom(roomCode) {
-  await redis.expire(roomKey(roomCode), ROOM_TTL_SECONDS);
-  await redis.expire(roomMetaKey(roomCode), ROOM_TTL_SECONDS);
-}
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h3>Change room</h3>
+      <input id="roomInput" type="text" inputmode="latin" autocomplete="off" placeholder="Example 4F8K2D" />
+      <div class="hint">Room code should be 4 to 8 characters using A to Z and 0 to 9</div>
+      <div class="footer">
+        <button id="cancelBtn" class="secondary">Cancel</button>
+        <button id="goBtn">Go</button>
+      </div>
+    </div>
+  </div>
 
-function wsSend(ws, obj) {
-  if (ws.readyState !== 1) return;
-  ws.send(JSON.stringify(obj));
-}
+  <div class="trialOverlay" id="trialOverlay">
+    <div class="trialBox">
+      <h3>Trial ended</h3>
+      <p>Continue to keep practicing in this room.</p>
+      <div class="footer">
+        <button id="tryAnotherBtn" class="secondary">Try another</button>
+        <button id="endHereBtn" class="secondary">End here</button>
+        <button id="continueBtn">Continue</button>
+      </div>
+    </div>
+  </div>
 
-function bytesOf(data) {
-  if (typeof data === "string") return Buffer.byteLength(data);
-  if (Buffer.isBuffer(data)) return data.length;
-  return Buffer.byteLength(String(data));
-}
+  <script>
+    const ROOM_RE = /^[A-Z0-9]{4,8}$/;
+    const CLIENT_ID_KEY = "unline_client_id_v1";
 
-function getIP(req) {
-  const xf = req.headers["x-forwarded-for"];
-  if (typeof xf === "string" && xf.length > 0) return xf.split(",")[0].trim();
-  return req.socket?.remoteAddress || "unknown";
-}
+    const board = document.getElementById("board");
+    const ctx = board.getContext("2d");
 
-function randomRoomCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
+    const roomCodeEl = document.getElementById("roomCode");
+    const visitorsEl = document.getElementById("visitors");
 
-function clampInt(v, min, max) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return min;
-  return Math.min(max, Math.max(min, Math.floor(n)));
-}
+    const roleValue = document.getElementById("roleValue");
+    const sessionValue = document.getElementById("sessionValue");
+    const trialTimerEl = document.getElementById("trialTimer");
+    const sockDot = document.getElementById("sockDot");
+    const sockText = document.getElementById("sockText");
 
-function computeTrialEndsAt(meta) {
-  if (!meta || meta.sessionState !== "trial" || !meta.trialStartedAt) return 0;
-  return meta.trialStartedAt + TRIAL_SECONDS * 1000;
-}
+    const controls = document.getElementById("controls");
+    const banner = document.getElementById("banner");
 
-function computeSessionState(meta) {
-  const state = String(meta?.sessionState || "idle");
-  if (state === "trial") {
-    const endsAt = computeTrialEndsAt(meta);
-    if (endsAt && now() >= endsAt) return "ended";
-    return "trial";
-  }
-  if (state === "continued") return "continued";
-  if (state === "ended") return "ended";
-  return "idle";
-}
+    const penBtn = document.getElementById("penBtn");
+    const eraserBtn = document.getElementById("eraserBtn");
+    const colorInput = document.getElementById("color");
+    const sizeInput = document.getElementById("size");
+    const sizeLabel = document.getElementById("sizeLabel");
+    const clearBtn = document.getElementById("clearBtn");
+    const copyBtn = document.getElementById("copyBtn");
 
-/* IP state */
+    const changeBtn = document.getElementById("changeBtn");
+    const backBtn = document.getElementById("backBtn");
 
-const ipState = new Map();
+    const overlay = document.getElementById("overlay");
+    const roomInput = document.getElementById("roomInput");
+    const cancelBtn = document.getElementById("cancelBtn");
+    const goBtn = document.getElementById("goBtn");
 
-function getIpState(ip) {
-  let s = ipState.get(ip);
-  if (!s) {
-    s = { count: 0, windowStart: now(), conns: 0 };
-    ipState.set(ip, s);
-  }
-  return s;
-}
+    const trialOverlay = document.getElementById("trialOverlay");
+    const continueBtn = document.getElementById("continueBtn");
+    const tryAnotherBtn = document.getElementById("tryAnotherBtn");
+    const endHereBtn = document.getElementById("endHereBtn");
 
-function allowIpEvent(ip) {
-  const t = now();
-  const s = getIpState(ip);
+    const startVoiceBtn = document.getElementById("startVoiceBtn");
 
-  if (t - s.windowStart > WINDOW_MS) {
-    s.windowStart = t;
-    s.count = 0;
-  }
+    function getParams() {
+      const u = new URL(location.href);
+      return {
+        room: u.searchParams.get("room") || "",
+      };
+    }
 
-  s.count += 1;
-  return s.count <= MAX_EVENTS_PER_5S_PER_IP;
-}
+    function sanitizeRoom(v) {
+      return String(v || "").trim().toUpperCase();
+    }
 
-/* Rooms in memory */
+    function safeCopy(text) {
+      navigator.clipboard.writeText(text).catch(() => {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      });
+    }
 
-const rooms = new Map();
+    function makeClientId() {
+      const a = new Uint8Array(16);
+      crypto.getRandomValues(a);
+      return Array.from(a).map(x => x.toString(16).padStart(2, "0")).join("");
+    }
 
-function getRoom(roomCode) {
-  if (!rooms.has(roomCode)) {
-    rooms.set(roomCode, {
-      strokes: [],
-      clients: new Set(),
-      participants: new Set(), // ws
-      spectators: new Set(), // ws
-      meta: { sessionState: "idle", trialStartedAt: 0, lastRoomState: "quiet", lastActiveAt: now() },
-    });
-  }
-  return rooms.get(roomCode);
-}
-
-function promoteSpectatorIfPossible(room) {
-  // Keep room strictly 2 participants.
-  // If a participant slot opens, automatically promote the oldest spectator.
-  while (room && room.participants.size < 2 && room.spectators.size > 0) {
-    const next = room.spectators.values().next().value;
-    if (!next) break;
-    room.spectators.delete(next);
-    room.participants.add(next);
-    next._role = "participant";
-  }
-}
-
-function getCounts(room) {
-  return {
-    total: room.clients.size,
-    participants: room.participants.size,
-    spectators: room.spectators.size,
-  };
-}
-
-async function loadRoomMeta(roomCode) {
-  const meta = await redis.get(roomMetaKey(roomCode));
-  if (meta && typeof meta === "object") return meta;
-  return { sessionState: "idle", trialStartedAt: 0, lastRoomState: "quiet", lastActiveAt: now() };
-}
-
-async function saveRoomMeta(roomCode, meta) {
-  await redis.set(roomMetaKey(roomCode), meta, { ex: ROOM_TTL_SECONDS });
-  await touchRoom(roomCode);
-}
-
-function broadcast(roomCode, obj) {
-  const room = rooms.get(roomCode);
-  if (!room) return;
-  for (const client of room.clients) wsSend(client, obj);
-}
-
-function broadcastStatus(roomCode) {
-  const room = rooms.get(roomCode);
-  if (!room) return;
-
-  const counts = getCounts(room);
-  const meta = room.meta || {};
-  const sessionState = computeSessionState(meta);
-  const trialEndsAt = sessionState === "trial" ? computeTrialEndsAt(meta) : 0;
-
-  for (const client of room.clients) {
-    const role = room.participants.has(client) ? "participant" : "spectator";
-    wsSend(client, {
-      type: "status",
-      roomCode,
-      count: counts.total,
-      participants: counts.participants,
-      spectators: counts.spectators,
-      role,
-      sessionState,
-      trialEndsAt,
-    });
-  }
-}
-
-async function ensureTrialStarted(roomCode) {
-  const room = rooms.get(roomCode);
-  if (!room) return;
-  const meta = room.meta || {};
-  const state = computeSessionState(meta);
-
-  // Only start trial automatically when there are exactly 2 participants and session is idle
-  if (room.participants.size >= 2 && state === "idle") {
-    meta.sessionState = "trial";
-    meta.trialStartedAt = now();
-    meta.lastActiveAt = now();
-    meta.lastRoomState = "active";
-    room.meta = meta;
-    await saveRoomMeta(roomCode, meta);
-
-    broadcast(roomCode, {
-      type: "session",
-      roomCode,
-      sessionState: "trial",
-      trialEndsAt: computeTrialEndsAt(meta),
-    });
-  }
-}
-
-async function checkTrialExpiry(roomCode) {
-  const room = rooms.get(roomCode);
-  if (!room) return;
-  const meta = room.meta || {};
-  const state = computeSessionState(meta);
-  if (state !== "ended") return;
-
-  // Persist ended state once
-  if (meta.sessionState === "trial") {
-    meta.sessionState = "ended";
-    meta.lastActiveAt = now();
-    room.meta = meta;
-    await saveRoomMeta(roomCode, meta);
-    broadcast(roomCode, { type: "session", roomCode, sessionState: "ended" });
-  }
-}
-
-/* Matchmaking (simple MVP in memory) */
-
-const coachWaitQueues = new Map(); // key -> Set<ws>
-
-function matchKey(lang, goal) {
-  return `${String(lang || "EN").toUpperCase()}|${String(goal || "CONV").toUpperCase()}`;
-}
-
-function addCoachToQueue(ws, key) {
-  if (!coachWaitQueues.has(key)) coachWaitQueues.set(key, new Set());
-  coachWaitQueues.get(key).add(ws);
-  ws._matchKey = key;
-  ws._isCoachWaiting = true;
-}
-
-function removeCoachFromQueue(ws) {
-  const key = ws._matchKey;
-  if (!key) return;
-  const q = coachWaitQueues.get(key);
-  if (q) q.delete(ws);
-  ws._matchKey = "";
-  ws._isCoachWaiting = false;
-}
-
-/* Server */
-
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
-  res.end("ok");
-});
-
-const wss = new WebSocketServer({ server });
-
-wss.on("connection", (ws, req) => {
-  const ip = getIP(req);
-  ws._ip = ip;
-  ws._joined = false;
-  ws._roomCode = "";
-  ws._role = ""; // participant | spectator
-  ws._matchKey = "";
-  ws._isCoachWaiting = false;
-
-  const st = getIpState(ip);
-  st.conns += 1;
-
-  if (st.conns > MAX_CONN_PER_IP) {
-    st.conns = Math.max(0, st.conns - 1);
-    try { ws.close(1008, "too many connections"); } catch {}
-    return;
-  }
-
-  ws.on("close", async () => {
-    const s = ipState.get(ws._ip);
-    if (s) s.conns = Math.max(0, s.conns - 1);
-
-    removeCoachFromQueue(ws);
-
-    if (ws._joined && ws._roomCode) {
-      const room = rooms.get(ws._roomCode);
-      if (room) {
-        room.clients.delete(ws);
-        room.participants.delete(ws);
-        room.spectators.delete(ws);
-
-        // If a participant slot opened, promote the oldest spectator automatically.
-        promoteSpectatorIfPossible(room);
-
-        // Update meta and persist lastRoomState
-        const meta = room.meta || (await loadRoomMeta(ws._roomCode));
-        meta.lastActiveAt = now();
-        meta.lastRoomState = room.participants.size >= 2 ? "active" : "quiet";
-        room.meta = meta;
-        await saveRoomMeta(ws._roomCode, meta);
-
-        broadcastStatus(ws._roomCode);
-
-        if (room.clients.size === 0) {
-          rooms.delete(ws._roomCode);
-        }
+    function getClientId() {
+      let id = localStorage.getItem(CLIENT_ID_KEY);
+      if (!id || id.length < 16) {
+        id = makeClientId();
+        localStorage.setItem(CLIENT_ID_KEY, id);
       }
-    }
-  });
-
-  ws.on("message", async (data) => {
-    const ipNow = ws._ip || "unknown";
-    const msgBytes = bytesOf(data);
-
-    if (msgBytes > MAX_MSG_BYTES) {
-      wsSend(ws, { type: "warn", reason: "message too big" });
-      return;
+      return id;
     }
 
-    if (!allowIpEvent(ipNow)) return;
+    const clientId = getClientId();
 
-    const raw = typeof data === "string" ? data : data.toString("utf8");
-    const msg = safeJsonParse(raw);
-    if (!msg || typeof msg !== "object") return;
-
-    const type = String(msg.type || "");
-
-    // Heartbeat
-    if (type === "ping") {
-      wsSend(ws, { type: "pong" });
-      return;
+    function computeWsUrl() {
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      return `${proto}://${location.host}/ws`;
     }
 
-    // Matchmaking messages live on index.html (no room join required)
-    if (type === "match_request") {
-      const role = String(msg.role || "");
-      const lang = String(msg.lang || "EN").toUpperCase();
-      const goal = String(msg.goal || "CONV").toUpperCase();
-      const key = matchKey(lang, goal);
+    const { room } = getParams();
+    const currentRoom = sanitizeRoom(room);
 
-      if (role === "coach") {
-        removeCoachFromQueue(ws);
-        addCoachToQueue(ws, key);
-        wsSend(ws, { type: "waiting", role: "coach" });
+    if (!ROOM_RE.test(currentRoom)) {
+      alert("Invalid room code");
+      location.href = "index.html";
+    }
+
+    roomCodeEl.textContent = currentRoom;
+
+    function resizeCanvas() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const w = Math.floor(window.innerWidth);
+      const h = Math.floor(window.innerHeight);
+
+      board.width = Math.floor(w * dpr);
+      board.height = Math.floor(h * dpr);
+      board.style.width = w + "px";
+      board.style.height = h + "px";
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    function clearLocalPixels() {
+      const rect = board.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    function getNormPoint(evt) {
+      const rect = board.getBoundingClientRect();
+      const x = evt.clientX - rect.left;
+      const y = evt.clientY - rect.top;
+      const nx = rect.width ? x / rect.width : 0;
+      const ny = rect.height ? y / rect.height : 0;
+      return { nx, ny };
+    }
+
+    resizeCanvas();
+    window.addEventListener("resize", () => { resizeCanvas(); redrawAll(); });
+
+    sizeInput.addEventListener("input", () => { sizeLabel.textContent = String(sizeInput.value); });
+
+    let tool = "pen";
+    function setTool(next) {
+      tool = next === "eraser" ? "eraser" : "pen";
+      penBtn.classList.toggle("active", tool === "pen");
+      eraserBtn.classList.toggle("active", tool === "eraser");
+    }
+    penBtn.addEventListener("click", () => setTool("pen"));
+    eraserBtn.addEventListener("click", () => setTool("eraser"));
+
+    function openOverlay() {
+      overlay.classList.add("show");
+      roomInput.value = "";
+      roomInput.focus();
+    }
+    function closeOverlay() {
+      overlay.classList.remove("show");
+    }
+    function goRoom(value) {
+      const clean = sanitizeRoom(value);
+      if (!ROOM_RE.test(clean)) {
+        alert("Invalid room code");
+        return;
+      }
+      location.href = `canvas.html?room=${encodeURIComponent(clean)}`;
+    }
+
+    changeBtn.addEventListener("click", openOverlay);
+    backBtn.addEventListener("click", () => { location.href = "index.html"; });
+    cancelBtn.addEventListener("click", closeOverlay);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeOverlay(); });
+    goBtn.addEventListener("click", () => goRoom(roomInput.value));
+    roomInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") goRoom(roomInput.value);
+      if (e.key === "Escape") closeOverlay();
+    });
+
+    let allStrokes = [];
+
+    function drawSegment(seg) {
+      const rect = board.getBoundingClientRect();
+      const x0 = seg.x0n * rect.width;
+      const y0 = seg.y0n * rect.height;
+      const x1 = seg.x1n * rect.width;
+      const y1 = seg.y1n * rect.height;
+
+      ctx.save();
+      if (seg.tool === "eraser") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = String(seg.color || "#ffffff");
+      }
+      ctx.lineWidth = Number(seg.size || 6);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function redrawAll() {
+      clearLocalPixels();
+      for (const s of allStrokes) drawSegment(s);
+    }
+
+    function setAllStrokes(strokes) {
+      allStrokes = Array.isArray(strokes) ? strokes.slice() : [];
+      redrawAll();
+    }
+
+    function addStrokeLocal(seg) {
+      allStrokes.push(seg);
+      if (allStrokes.length > 8000) allStrokes.splice(0, allStrokes.length - 8000);
+    }
+
+    function clearAllStrokes() {
+      allStrokes = [];
+      clearLocalPixels();
+    }
+
+    let ws = null;
+    let reconnectAttempt = 0;
+    let connectTimeoutId = null;
+    let heartbeatId = null;
+    let lastPongAt = Date.now();
+
+    let myRole = "participant";
+    let sessionState = "idle";
+    let trialEndsAt = 0;
+    let timerTickId = null;
+
+    function setRole(role) {
+      myRole = role === "spectator" ? "spectator" : "participant";
+      roleValue.textContent = myRole === "spectator" ? "Watcher" : "Participant";
+      const isSpectator = myRole === "spectator";
+      controls.style.display = isSpectator ? "none" : "grid";
+      banner.classList.toggle("show", isSpectator);
+      drawing = false;
+      last = null;
+    }
+
+    function computeTrialLabel(state) {
+      if (state === "trial") return "Trial";
+      if (state === "continued") return "Continued";
+      if (state === "ended") return "Ended";
+      return "Idle";
+    }
+
+    function setSession(state, endsAtMs) {
+      sessionState = String(state || "idle");
+      sessionValue.textContent = computeTrialLabel(sessionState);
+
+      if (typeof endsAtMs === "number" && endsAtMs > 0) trialEndsAt = endsAtMs;
+      else if (sessionState !== "trial") trialEndsAt = 0;
+
+      if (timerTickId) clearInterval(timerTickId);
+      timerTickId = setInterval(updateTimer, 250);
+      updateTimer();
+
+      if (sessionState === "ended" && myRole === "participant") trialOverlay.classList.add("show");
+      else trialOverlay.classList.remove("show");
+    }
+
+    function updateTimer() {
+      if (sessionState !== "trial" || !trialEndsAt) {
+        trialTimerEl.textContent = "--:--";
+        return;
+      }
+      const leftMs = Math.max(0, trialEndsAt - Date.now());
+      const sec = Math.floor(leftMs / 1000);
+      const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+      const ss = String(sec % 60).padStart(2, "0");
+      trialTimerEl.textContent = `${mm}:${ss}`;
+    }
+
+    function wsSend(obj) {
+      if (!ws || ws.readyState !== 1) return;
+      try { ws.send(JSON.stringify(obj)); } catch {}
+    }
+
+    function stopHeartbeat() {
+      if (heartbeatId) clearInterval(heartbeatId);
+      heartbeatId = null;
+    }
+
+    function startHeartbeat() {
+      stopHeartbeat();
+      lastPongAt = Date.now();
+      heartbeatId = setInterval(() => {
+        if (!ws || ws.readyState !== 1) return;
+        wsSend({ type: "ping" });
+        if (Date.now() - lastPongAt > 45000) {
+          try { ws.close(); } catch {}
+        }
+      }, 20000);
+    }
+
+    function scheduleReconnect() {
+      const delay = Math.min(8000, 1000 * Math.pow(2, reconnectAttempt));
+      reconnectAttempt += 1;
+      setTimeout(() => connectWs(), delay);
+    }
+
+    function connectWs() {
+      if (ws && (ws.readyState === 0 || ws.readyState === 1)) return;
+
+      sockText.textContent = "Connecting";
+      sockDot.classList.remove("ok");
+      sockDot.classList.remove("warn");
+
+      const wsUrl = computeWsUrl();
+
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch {
+        scheduleReconnect();
         return;
       }
 
-      if (role === "student") {
-        const q = coachWaitQueues.get(key);
-        const coach = q ? Array.from(q).find(c => c.readyState === 1) : null;
-        if (!coach) {
-          wsSend(ws, { type: "waiting", role: "student" });
+      if (connectTimeoutId) clearTimeout(connectTimeoutId);
+      connectTimeoutId = setTimeout(() => {
+        if (ws && ws.readyState === 0) {
+          try { ws.close(); } catch {}
+        }
+      }, 8000);
+
+      ws.addEventListener("open", () => {
+        reconnectAttempt = 0;
+        sockDot.classList.add("ok");
+        sockText.textContent = "Online";
+        wsSend({ type: "join", roomCode: currentRoom, clientId });
+        startHeartbeat();
+      });
+
+      ws.addEventListener("close", () => {
+        stopHeartbeat();
+        sockDot.classList.remove("ok");
+        sockDot.classList.add("warn");
+        sockText.textContent = "Offline";
+        scheduleReconnect();
+      });
+
+      ws.addEventListener("error", () => {
+        stopHeartbeat();
+        sockDot.classList.remove("ok");
+        sockDot.classList.add("warn");
+        sockText.textContent = "Offline";
+      });
+
+      ws.addEventListener("message", (ev) => {
+        let msg = null;
+        try { msg = JSON.parse(ev.data); } catch { return; }
+        if (!msg || typeof msg !== "object") return;
+
+        if (msg.type === "pong") {
+          lastPongAt = Date.now();
           return;
         }
 
-        // Consume coach
-        q.delete(coach);
-        coach._isCoachWaiting = false;
+        if (msg.type === "warn") {
+          if (msg.reason) alert(String(msg.reason));
+          return;
+        }
 
-        const roomCode = randomRoomCode();
-        const meta = { sessionState: "idle", trialStartedAt: 0, lastRoomState: "quiet", lastActiveAt: now() };
-        await saveRoomMeta(roomCode, meta);
-        await redis.set(roomKey(roomCode), [], { ex: ROOM_TTL_SECONDS });
+        if (msg.type === "status" && msg.roomCode === currentRoom) {
+          visitorsEl.textContent = String(msg.count || 0);
+          if (msg.role) setRole(msg.role);
+          if (msg.sessionState) setSession(msg.sessionState, msg.trialEndsAt || 0);
+          return;
+        }
 
-        wsSend(coach, { type: "matched", roomCode });
-        wsSend(ws, { type: "matched", roomCode });
-        return;
-      }
+        if (msg.type === "init" && msg.roomCode === currentRoom) {
+          const strokes = Array.isArray(msg.strokes) ? msg.strokes : [];
+          setAllStrokes(strokes);
+          if (msg.role) setRole(msg.role);
+          if (msg.sessionState) setSession(msg.sessionState, msg.trialEndsAt || 0);
+          visitorsEl.textContent = String(msg.count || 0);
+          return;
+        }
 
-      wsSend(ws, { type: "warn", reason: "invalid match role" });
-      return;
-    }
+        if (msg.type === "session" && msg.roomCode === currentRoom) {
+          if (msg.sessionState) setSession(msg.sessionState, msg.trialEndsAt || 0);
+          return;
+        }
 
-    // Room based messages
-    const roomCode = normalizeRoom(msg.roomCode || ws._roomCode);
+        if (msg.type === "stroke" && msg.roomCode === currentRoom && msg.stroke) {
+          addStrokeLocal(msg.stroke);
+          drawSegment(msg.stroke);
+          return;
+        }
 
-    if (!ROOM_CODE_RE.test(roomCode)) {
-      wsSend(ws, { type: "warn", reason: "invalid room" });
-      return;
-    }
+        if (msg.type === "clear" && msg.roomCode === currentRoom) {
+          clearAllStrokes();
+          return;
+        }
 
-    if (type === "join") {
-      if (ws._joined) return;
-
-      const room = getRoom(roomCode);
-
-      if (room.clients.size >= MAX_CLIENTS_PER_ROOM) {
-        wsSend(ws, { type: "warn", reason: "room full" });
-        return;
-      }
-
-      ws._joined = true;
-      ws._roomCode = roomCode;
-
-      // Assign role: first two are participants, others spectators
-      if (room.participants.size < 2) {
-        ws._role = "participant";
-        room.participants.add(ws);
-      } else {
-        ws._role = "spectator";
-        room.spectators.add(ws);
-      }
-
-      room.clients.add(ws);
-
-      // Load persisted strokes and meta
-      const savedStrokes = await redis.get(roomKey(roomCode));
-      if (Array.isArray(savedStrokes)) room.strokes = savedStrokes;
-
-      room.meta = await loadRoomMeta(roomCode);
-
-      // Session state reconciliation
-      const sessionState = computeSessionState(room.meta);
-      const trialEndsAt = sessionState === "trial" ? computeTrialEndsAt(room.meta) : 0;
-
-      // Send init
-      wsSend(ws, {
-        type: "init",
-        roomCode,
-        strokes: room.strokes,
-        count: room.clients.size,
-        role: ws._role,
-        sessionState,
-        trialEndsAt,
+        if (msg.type === "voice_error") {
+          alert(String(msg.reason || "Voice error"));
+          return;
+        }
       });
-
-      await touchRoom(roomCode);
-
-      // Update meta lastRoomState
-      room.meta.lastActiveAt = now();
-      room.meta.lastRoomState = room.participants.size >= 2 ? "active" : "quiet";
-      await saveRoomMeta(roomCode, room.meta);
-
-      broadcastStatus(roomCode);
-
-      // Auto start trial if two participants are present and session is idle
-      await ensureTrialStarted(roomCode);
-
-      // If trial already expired, convert to ended and inform clients
-      await checkTrialExpiry(roomCode);
-      return;
     }
 
-    if (!ws._joined || !ws._roomCode) {
-      wsSend(ws, { type: "warn", reason: "join required" });
-      return;
-    }
+    connectWs();
 
-    if (roomCode !== ws._roomCode) {
-      wsSend(ws, { type: "warn", reason: "room mismatch" });
-      return;
-    }
+    clearBtn.addEventListener("click", () => {
+      if (myRole === "spectator") return;
+      clearAllStrokes();
+      wsSend({ type: "clear", roomCode: currentRoom });
+    });
 
-    const room = getRoom(roomCode);
+    copyBtn.addEventListener("click", () => safeCopy(currentRoom));
 
-    // Keep session expiry updated on any message
-    await checkTrialExpiry(roomCode);
+    continueBtn.addEventListener("click", () => {
+      wsSend({ type: "continue", roomCode: currentRoom });
+      trialOverlay.classList.remove("show");
+    });
 
-    // Spectator restrictions
-    const isSpectator = room.spectators.has(ws);
+    tryAnotherBtn.addEventListener("click", () => { location.href = "index.html"; });
+    endHereBtn.addEventListener("click", () => { location.href = "index.html"; });
 
-    if (type === "stroke") {
-      if (isSpectator) return;
-
-      const stroke = msg.stroke;
-      if (!stroke || typeof stroke !== "object") return;
-
-      room.strokes.push(stroke);
-
-      if (room.strokes.length > MAX_ROOM_STROKES) {
-        room.strokes.splice(0, room.strokes.length - MAX_ROOM_STROKES);
+    startVoiceBtn.addEventListener("click", () => {
+      if (myRole === "spectator") {
+        alert("Spectator cannot start voice");
+        return;
       }
+      wsSend({ type: "voice_start_request", roomCode: currentRoom });
+    });
 
-      await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
-      await touchRoom(roomCode);
+    let drawing = false;
+    let last = null;
 
-      room.meta.lastActiveAt = now();
-      room.meta.lastRoomState = room.participants.size >= 2 ? "active" : "quiet";
-      await saveRoomMeta(roomCode, room.meta);
+    board.addEventListener("pointerdown", (e) => {
+      if (myRole === "spectator") return;
+      drawing = true;
+      board.setPointerCapture(e.pointerId);
+      last = getNormPoint(e);
+    });
 
-      broadcast(roomCode, { type: "stroke", roomCode, stroke });
-      return;
+    board.addEventListener("pointermove", (e) => {
+      if (myRole === "spectator") return;
+      if (!drawing || !last) return;
+      const p = getNormPoint(e);
+
+      const seg = {
+        x0n: last.nx,
+        y0n: last.ny,
+        x1n: p.nx,
+        y1n: p.ny,
+        color: colorInput.value,
+        size: Number(sizeInput.value),
+        tool: tool
+      };
+
+      addStrokeLocal(seg);
+      drawSegment(seg);
+      wsSend({ type: "stroke", roomCode: currentRoom, stroke: seg });
+
+      last = p;
+    });
+
+    function endDraw(e) {
+      if (!drawing) return;
+      drawing = false;
+      last = null;
+      try { board.releasePointerCapture(e.pointerId); } catch {}
     }
 
-    if (type === "clear") {
-      if (isSpectator) return;
-
-      room.strokes = [];
-      await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
-      await touchRoom(roomCode);
-
-      room.meta.lastActiveAt = now();
-      await saveRoomMeta(roomCode, room.meta);
-
-      broadcast(roomCode, { type: "clear", roomCode });
-      return;
-    }
-
-    if (type === "continue") {
-      if (isSpectator) return;
-
-      const meta = room.meta || (await loadRoomMeta(roomCode));
-      meta.sessionState = "continued";
-      meta.lastActiveAt = now();
-      meta.lastRoomState = room.participants.size >= 2 ? "active" : "quiet";
-      room.meta = meta;
-      await saveRoomMeta(roomCode, meta);
-
-      broadcast(roomCode, { type: "session", roomCode, sessionState: "continued" });
-      broadcastStatus(roomCode);
-      return;
-    }
-  });
-});
-
-server.listen(PORT, () => {
-  console.log(`WS server listening on port ${PORT}`);
-});
+    board.addEventListener("pointerup", endDraw);
+    board.addEventListener("pointercancel", endDraw);
+  </script>
+</body>
+</html>
