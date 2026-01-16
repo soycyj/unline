@@ -1,4 +1,4 @@
-<!doctype html>
+너가 준 새 코드들 보면 기존보다 너무 짧아졌어. 이게 맞아? canvas.html만 봐도 비교가 안될만큼 짧아졌어 .  <!doctype html> 
 <html lang="en">
 <head>
   <meta charset="utf-8" />
