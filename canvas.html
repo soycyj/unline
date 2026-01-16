@@ -2,108 +2,526 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Unline Canvas</title>
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto;
-      background: #0b0d10;
-      color: #e8eef9;
+    :root{
+      --bg:#0b0d10;
+      --panel:rgba(20,24,33,0.92);
+      --line:rgba(39,48,68,0.9);
+      --text:#e8eef9;
+      --muted:#a9b4c7;
+      --btn:#1f6feb;
+      --btn2:#2b3242;
+      --danger:#ef4444;
+      --ok:#22c55e;
     }
-    .bar {
-      display: flex;
-      gap: 12px;
-      padding: 12px;
-      border-bottom: 1px solid #273044;
-      align-items: center;
-      flex-wrap: wrap;
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto;
+      display:flex;
+      flex-direction:column;
+      height:100%;
     }
-    .pill {
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid #273044;
-      font-size: 12px;
+    .topbar{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      background:rgba(10,12,16,0.6);
+      backdrop-filter: blur(6px);
     }
-    .online { color: #22c55e; }
-    .offline { color: #ef4444; }
-    .log {
-      padding: 12px;
-      font-family: monospace;
-      font-size: 12px;
-      white-space: pre-wrap;
+    .left, .right{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
     }
+    .pill{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(20,24,33,0.6);
+      font-size:12px;
+      color:var(--muted);
+    }
+    .pill strong{color:var(--text);font-weight:700}
+    .status{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:0.2px;
+    }
+    .online{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
+    .offline{color:#450a0a;background:rgba(239,68,68,0.16);border-color:rgba(239,68,68,0.35)}
+    button{
+      padding:9px 12px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      cursor:pointer;
+      color:var(--text);
+      background:var(--btn2);
+      font-weight:700;
+      font-size:13px;
+    }
+    button.primary{background:var(--btn);border-color:rgba(31,111,235,0.7)}
+    button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
+    button:disabled{opacity:0.55;cursor:not-allowed}
+    .wrap{
+      display:grid;
+      grid-template-columns:1fr 320px;
+      gap:12px;
+      padding:12px;
+      height:calc(100% - 56px);
+    }
+    .stage{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:16px;
+      overflow:hidden;
+      position:relative;
+    }
+    canvas{
+      width:100%;
+      height:100%;
+      display:block;
+      touch-action:none;
+      background:rgba(10,12,16,0.55);
+    }
+    .side{display:flex;flex-direction:column;gap:12px}
+    .card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px;
+    }
+    .card h3{
+      margin:0 0 10px;
+      font-size:13px;
+      color:var(--muted);
+      font-weight:800;
+      letter-spacing:0.3px;
+      text-transform:uppercase;
+    }
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .small{font-size:12px;color:var(--muted);line-height:1.45;margin:8px 0 0}
+    .log{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+      font-size:11px;
+      color:rgba(232,238,249,0.8);
+      background:rgba(10,12,16,0.55);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
+      height:220px;
+      overflow:auto;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    @media (max-width:980px){ .wrap{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
+  <div class="topbar">
+    <div class="left">
+      <div id="connStatus" class="status offline">Offline</div>
+      <div class="pill">Room <strong id="roomTxt"></strong></div>
+      <div class="pill">Role <strong id="roleTxt">Unknown</strong></div>
+      <div class="pill">Visitors <strong id="visitorsTxt">0</strong></div>
+    </div>
+    <div class="right">
+      <button id="backBtn">Back</button>
+      <button id="clearBtn">Clear</button>
+    </div>
+  </div>
 
-<div class="bar">
-  <div class="pill">Status: <strong id="status" class="offline">Offline</strong></div>
-  <div class="pill">Room: <strong id="roomTxt"></strong></div>
-  <div class="pill">Visitors: <strong id="visitorsTxt">0</strong></div>
-  <div class="pill">Role: <strong id="roleTxt">Unknown</strong></div>
-</div>
+  <div class="wrap">
+    <div class="stage">
+      <canvas id="board"></canvas>
+    </div>
 
-<div class="log" id="log"></div>
+    <div class="side">
+      <div class="card">
+        <h3>Voice</h3>
+        <div class="row">
+          <button class="primary" id="startVoiceBtn">Start voice</button>
+          <button class="danger" id="stopVoiceBtn" disabled>Stop</button>
+        </div>
+        <p class="small" id="voiceState">Idle</p>
+        <audio id="remoteAudio" autoplay playsinline></audio>
+        <p class="small" id="voiceHint"></p>
+      </div>
 
-<script>
-  const $ = id => document.getElementById(id);
-  const logEl = $("log");
+      <div class="card">
+        <h3>Debug</h3>
+        <div class="row">
+          <button id="reconnectBtn">Reconnect</button>
+        </div>
+        <p class="small" id="wsUrlTxt"></p>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </div>
 
-  function log(msg) {
-    logEl.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
-  }
+  <script>
+    const $ = (id) => document.getElementById(id);
 
-  const qs = new URLSearchParams(location.search);
-  const room = qs.get("room") || "TEST";
-  $("roomTxt").textContent = room;
-
-  // clientId는 내부 식별용으로 자동 생성
-  let clientId = qs.get("clientId");
-  if (!clientId) {
-    clientId = localStorage.getItem("unline_clientId") ||
-      ("c" + Math.random().toString(16).slice(2, 10));
-    localStorage.setItem("unline_clientId", clientId);
-  }
-
-  const wsProto = location.protocol === "https:" ? "wss" : "ws";
-  const wsUrl =
-    `${wsProto}://${location.host}/ws` +
-    `?room=${encodeURIComponent(room)}` +
-    `&clientId=${encodeURIComponent(clientId)}`;
-
-  log("WS URL = " + wsUrl);
-
-  let ws = new WebSocket(wsUrl);
-
-  ws.onopen = () => {
-    $("status").textContent = "Online";
-    $("status").className = "online";
-    log("WebSocket connected");
-    ws.send(JSON.stringify({ type: "hello" }));
-  };
-
-  ws.onclose = () => {
-    $("status").textContent = "Offline";
-    $("status").className = "offline";
-    log("WebSocket closed");
-  };
-
-  ws.onerror = () => {
-    log("WebSocket error");
-  };
-
-  ws.onmessage = (e) => {
-    let msg;
-    try { msg = JSON.parse(e.data); } catch { return; }
-
-    if (msg.type === "room_state") {
-      $("visitorsTxt").textContent = msg.visitors;
-      $("roleTxt").textContent = msg.role;
-      log(`room_state → visitors=${msg.visitors}, role=${msg.role}`);
+    function log(msg){
+      const el = $("log");
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+      el.textContent += line;
+      el.scrollTop = el.scrollHeight;
     }
-  };
-</script>
 
+    function setConn(online){
+      const el = $("connStatus");
+      if(online){
+        el.textContent = "Online";
+        el.classList.remove("offline");
+        el.classList.add("online");
+      }else{
+        el.textContent = "Offline";
+        el.classList.remove("online");
+        el.classList.add("offline");
+      }
+    }
+
+    function genClientId(){
+      return "c" + Math.random().toString(16).slice(2,10);
+    }
+
+    const qs = new URLSearchParams(location.search);
+    const room = (qs.get("room") || "").trim();
+    if(!room){
+      alert("room code가 필요합니다");
+      location.href = "/";
+    }
+
+    const userProvidedClientId = !!(qs.get("clientId") || "").trim();
+
+    let clientId = (qs.get("clientId") || "").trim();
+    if(!clientId){
+      const key = `unline_auto_clientId_${room}`;
+      clientId = localStorage.getItem(key) || genClientId();
+      localStorage.setItem(key, clientId);
+    }
+
+    $("roomTxt").textContent = room;
+
+    let currentRole = "Unknown";
+    let currentVisitors = 0;
+
+    function applyRoomState(payload){
+      if(payload && payload.role) currentRole = payload.role;
+      if(payload && typeof payload.visitors === "number") currentVisitors = payload.visitors;
+      $("roleTxt").textContent = currentRole;
+      $("visitorsTxt").textContent = String(currentVisitors);
+      updateVoiceUi();
+    }
+
+    function canVoice(){
+      return userProvidedClientId && currentRole === "Participant";
+    }
+
+    function updateVoiceUi(){
+      if(!userProvidedClientId){
+        $("voiceHint").textContent = "voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다";
+      }else if(currentRole !== "Participant"){
+        $("voiceHint").textContent = "현재 role이 Participant가 아닙니다";
+      }else{
+        $("voiceHint").textContent = "";
+      }
+      $("startVoiceBtn").disabled = !canVoice() || callActive;
+      $("stopVoiceBtn").disabled = !callActive;
+    }
+
+    const wsProto = (location.protocol === "https:") ? "wss" : "ws";
+    const currentWsUrl =
+      `${wsProto}://${location.host}/ws` +
+      `?room=${encodeURIComponent(room)}` +
+      `&clientId=${encodeURIComponent(clientId)}`;
+
+    $("wsUrlTxt").textContent = "WS URL " + currentWsUrl;
+    log("WS URL " + currentWsUrl);
+
+    let ws = null;
+
+    function send(type, data = {}){
+      if(!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type, ...data }));
+    }
+
+    function connect(){
+      if(ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)){
+        log("WS already open or connecting");
+        return;
+      }
+
+      ws = new WebSocket(currentWsUrl);
+
+      ws.addEventListener("open", () => {
+        setConn(true);
+        log("WS open");
+        send("hello", {});
+      });
+
+      ws.addEventListener("close", () => {
+        setConn(false);
+        log("WS close");
+        currentRole = "Unknown";
+        $("roleTxt").textContent = currentRole;
+        updateVoiceUi();
+      });
+
+      ws.addEventListener("error", () => {
+        setConn(false);
+        log("WS error");
+      });
+
+      ws.addEventListener("message", async (evt) => {
+        let msg = null;
+        try{ msg = JSON.parse(evt.data); }catch(e){ return; }
+        const type = msg.type || "";
+
+        if(type === "room_state"){ applyRoomState(msg); return; }
+        if(type === "draw"){ applyRemoteStroke(msg); return; }
+        if(type === "clear"){ clearCanvas(false); return; }
+
+        if(type === "voice_request"){ onVoiceRequest(msg); return; }
+        if(type === "voice_accept"){ onVoiceAccept(msg); return; }
+        if(type === "voice_reject"){ onVoiceReject(msg); return; }
+        if(type === "voice_offer"){ await onVoiceOffer(msg); return; }
+        if(type === "voice_answer"){ await onVoiceAnswer(msg); return; }
+        if(type === "voice_ice"){ await onVoiceIce(msg); return; }
+        if(type === "voice_stop"){ onVoiceStop(msg); return; }
+      });
+    }
+
+    $("reconnectBtn").addEventListener("click", () => {
+      try{ if(ws) ws.close(); }catch(e){}
+      ws = null;
+      setConn(false);
+      connect();
+    });
+
+    $("backBtn").addEventListener("click", () => { location.href = "/"; });
+
+    // Drawing
+    const canvas = $("board");
+    const ctx = canvas.getContext("2d");
+    let drawing = false;
+    let last = null;
+
+    function resize(){
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(232,238,249,0.95)";
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    function posFromEvent(e){
+      const rect = canvas.getBoundingClientRect();
+      return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
+    }
+
+    function stroke(a, b){
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    function applyRemoteStroke(msg){
+      if(!msg || !msg.a || !msg.b) return;
+      stroke(msg.a, msg.b);
+    }
+
+    function clearCanvas(broadcast){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(broadcast) send("clear", {});
+    }
+
+    function start(e){ drawing = true; last = posFromEvent(e); }
+    function move(e){
+      if(!drawing) return;
+      const p = posFromEvent(e);
+      stroke(last, p);
+      send("draw", { a:last, b:p });
+      last = p;
+    }
+    function end(){ drawing = false; last = null; }
+
+    canvas.addEventListener("pointerdown", (e) => { canvas.setPointerCapture(e.pointerId); start(e); });
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+
+    $("clearBtn").addEventListener("click", () => { clearCanvas(true); });
+
+    // Voice WebRTC
+    let pc = null;
+    let localStream = null;
+    let callActive = false;
+    let isInitiator = false;
+
+    const rtcConfig = { iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }] };
+
+    function setVoiceState(t){
+      $("voiceState").textContent = t;
+      updateVoiceUi();
+    }
+
+    async function ensureLocalAudio(){
+      if(localStream) return localStream;
+      localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+      return localStream;
+    }
+
+    async function createPeer(){
+      pc = new RTCPeerConnection(rtcConfig);
+
+      pc.onicecandidate = (e) => {
+        if(e.candidate) send("voice_ice", { candidate: e.candidate });
+      };
+
+      pc.ontrack = (e) => {
+        const stream = e.streams && e.streams[0];
+        if(stream) $("remoteAudio").srcObject = stream;
+      };
+
+      const stream = await ensureLocalAudio();
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
+    }
+
+    $("startVoiceBtn").addEventListener("click", async () => {
+      if(!userProvidedClientId){
+        alert("voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다");
+        return;
+      }
+      if(currentRole !== "Participant"){
+        alert("Participant만 음성을 시작할 수 있습니다");
+        return;
+      }
+      if(callActive){
+        alert("이미 통화가 진행 중입니다");
+        return;
+      }
+      setVoiceState("Requesting");
+      send("voice_request", {});
+      log("voice_request sent");
+    });
+
+    $("stopVoiceBtn").addEventListener("click", () => {
+      if(!callActive) return;
+      send("voice_stop", {});
+      teardownVoice("Stopped");
+    });
+
+    function onVoiceRequest(){
+      if(!canVoice()){ send("voice_reject", { reason:"not_allowed" }); return; }
+      if(callActive){ send("voice_reject", { reason:"busy" }); return; }
+
+      const ok = confirm("상대가 음성 연결을 요청했습니다. 수락할까요");
+      if(!ok){ send("voice_reject", { reason:"rejected" }); return; }
+
+      send("voice_accept", {});
+      setVoiceState("Accepted waiting offer");
+      log("voice_accept sent");
+    }
+
+    async function onVoiceAccept(){
+      if(callActive) return;
+      try{
+        isInitiator = true;
+        callActive = true;
+        setVoiceState("Creating offer");
+        await createPeer();
+
+        const offer = await pc.createOffer({ offerToReceiveAudio:true });
+        await pc.setLocalDescription(offer);
+        send("voice_offer", { sdp: offer });
+        setVoiceState("Offer sent");
+      }catch(e){
+        teardownVoice("Voice error");
+      }
+    }
+
+    function onVoiceReject(msg){
+      callActive = false;
+      isInitiator = false;
+      setVoiceState("Rejected");
+      alert("상대가 음성 요청을 거절했습니다");
+      log("voice_reject " + ((msg && msg.reason) || "unknown"));
+    }
+
+    async function onVoiceOffer(msg){
+      if(callActive && isInitiator) return;
+      try{
+        if(!callActive){ callActive = true; isInitiator = false; }
+        setVoiceState("Received offer");
+        await createPeer();
+
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        send("voice_answer", { sdp: answer });
+        setVoiceState("Answer sent");
+      }catch(e){
+        teardownVoice("Voice error");
+      }
+    }
+
+    async function onVoiceAnswer(msg){
+      if(!pc) return;
+      try{
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        setVoiceState("Connected");
+      }catch(e){
+        teardownVoice("Voice error");
+      }
+    }
+
+    async function onVoiceIce(msg){
+      if(!pc || !msg || !msg.candidate) return;
+      try{ await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); }catch(e){}
+    }
+
+    function onVoiceStop(){
+      teardownVoice("Peer stopped");
+      alert("상대가 음성을 종료했습니다");
+    }
+
+    function teardownVoice(stateText){
+      callActive = false;
+      isInitiator = false;
+
+      try{ if(pc) pc.close(); }catch(e){}
+      pc = null;
+
+      try{ if(localStream) localStream.getTracks().forEach(t => t.stop()); }catch(e){}
+      localStream = null;
+
+      try{ $("remoteAudio").srcObject = null; }catch(e){}
+      setVoiceState(stateText || "Idle");
+    }
+
+    setVoiceState("Idle");
+    connect();
+  </script>
 </body>
 </html>
