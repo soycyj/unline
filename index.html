@@ -1,11 +1,105 @@
 <!doctype html>
-<html>
+<html lang="ko">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Unline</title>
+  <style>
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto;
+      background:#0b0d10;
+      color:#e8eef9;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:100vh;
+    }
+    .card{
+      width:min(520px, 92vw);
+      border:1px solid #273044;
+      border-radius:16px;
+      padding:18px;
+      background:rgba(20,24,33,0.9);
+    }
+    h1{margin:0 0 10px;font-size:20px}
+    p{margin:0 0 14px;color:#a9b4c7;font-size:13px;line-height:1.5}
+    input{
+      width:100%;
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid #273044;
+      background:rgba(10,12,16,0.6);
+      color:#e8eef9;
+      font-size:14px;
+      outline:none;
+    }
+    .row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+    button{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #273044;
+      background:#2b3242;
+      color:#e8eef9;
+      cursor:pointer;
+      font-weight:700;
+      font-size:13px;
+    }
+    button.primary{background:#1f6feb;border-color:rgba(31,111,235,0.7)}
+    .small{margin-top:12px;color:#a9b4c7;font-size:12px;line-height:1.5}
+    code{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New";font-size:12px}
+  </style>
 </head>
 <body>
-  <h1>Unline is running</h1>
-  <p>If you see this, Render static serving works.</p>
+  <div class="card">
+    <h1>Unline</h1>
+    <p>room code만 입력해도 입장 가능합니다. voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다.</p>
+
+    <input id="room" placeholder="Room code" autocomplete="off" />
+
+    <div class="row">
+      <button id="joinViewer">Join as viewer</button>
+      <button class="primary" id="joinParticipant">Join as participant</button>
+    </div>
+
+    <div class="small" id="hint"></div>
+  </div>
+
+  <script>
+    const roomEl = document.getElementById("room");
+    const hint = document.getElementById("hint");
+
+    function genClientId(){
+      return "c" + Math.random().toString(16).slice(2,10);
+    }
+
+    function go(url){
+      location.href = url;
+    }
+
+    function getRoom(){
+      return (roomEl.value || "").trim();
+    }
+
+    document.getElementById("joinViewer").addEventListener("click", () => {
+      const room = getRoom();
+      if(!room){ alert("room code를 입력해 주세요"); return; }
+      go(`/canvas.html?room=${encodeURIComponent(room)}`);
+    });
+
+    document.getElementById("joinParticipant").addEventListener("click", () => {
+      const room = getRoom();
+      if(!room){ alert("room code를 입력해 주세요"); return; }
+
+      const key = `unline_participant_clientId_${room}`;
+      const stored = localStorage.getItem(key);
+      const clientId = stored || genClientId();
+      localStorage.setItem(key, clientId);
+
+      go(`/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}`);
+    });
+
+    hint.textContent = "참가자 링크는 room별로 clientId를 저장합니다. 새로고침해도 같은 참가자로 유지됩니다.";
+  </script>
 </body>
 </html>
