@@ -19,13 +19,13 @@ const wss = new WebSocketServer({ server, path: "/ws" });
 
 const rooms = new Map();
 
-// matchmaking state
-const teachersOnline = new Map(); // teacherId -> { createdAt, meta }
-const teacherQueue = []; // FIFO teacherId
+// teacher matchmaking state
+// teachers teacherId -> { status waiting|matched, matchedRoom, teacherUrl, updatedAt }
+const teachers = new Map();
+// queue holds teacherIds
+const teacherQueue = [];
 
-function now() {
-  return Date.now();
-}
+function now() { return Date.now(); }
 
 function genId(prefix) {
   return prefix + Math.random().toString(16).slice(2, 10);
@@ -33,6 +33,10 @@ function genId(prefix) {
 
 function genRoomCode() {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
+function getBase(req) {
+  return req.protocol + "://" + req.get("host");
 }
 
 function getRoom(room) {
@@ -47,16 +51,12 @@ function getRoom(room) {
 }
 
 function safeSend(ws, obj) {
-  try {
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
-  } catch {}
+  try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); } catch {}
 }
 
 function ensureRoles(roomState) {
   const entries = Array.from(roomState.roleByClientId.entries());
-  const participants = entries
-    .filter(([, r]) => r === "Participant")
-    .map(([id]) => id);
+  const participants = entries.filter(([, r]) => r === "Participant").map(([id]) => id);
 
   if (participants.length > 2) {
     for (let i = 2; i < participants.length; i++) {
@@ -64,10 +64,7 @@ function ensureRoles(roomState) {
     }
   }
 
-  let count = Array.from(roomState.roleByClientId.values()).filter(
-    (r) => r === "Participant"
-  ).length;
-
+  let count = Array.from(roomState.roleByClientId.values()).filter(r => r === "Participant").length;
   if (count < 2) {
     for (const id of roomState.roleByClientId.keys()) {
       if (roomState.roleByClientId.get(id) !== "Participant") {
@@ -78,7 +75,6 @@ function ensureRoles(roomState) {
     }
   }
 
-  // normalize
   for (const [id, r] of roomState.roleByClientId.entries()) {
     if (r !== "Participant" && r !== "Viewer") roomState.roleByClientId.set(id, "Viewer");
   }
@@ -87,7 +83,6 @@ function ensureRoles(roomState) {
 function broadcastRoomState(roomState) {
   ensureRoles(roomState);
   const visitors = roomState.sockets.size;
-
   for (const ws of roomState.sockets) {
     if (ws.readyState !== 1) continue;
     const clientId = roomState.clientIdBySocket.get(ws);
@@ -102,72 +97,104 @@ function isParticipant(roomState, ws) {
   return role === "Participant";
 }
 
-// matchmaking endpoints
+// teacher online
 app.post("/api/teacher/online", (req, res) => {
-  const teacherId = (req.body && String(req.body.teacherId || "")) || "";
+  const teacherId = String(req.body?.teacherId || "").trim();
   if (!teacherId) return res.status(400).json({ ok: false, error: "missing teacherId" });
 
-  if (!teachersOnline.has(teacherId)) {
-    teachersOnline.set(teacherId, { createdAt: now(), meta: req.body && req.body.meta ? req.body.meta : {} });
+  const t = teachers.get(teacherId);
+  if (!t || t.status !== "waiting") {
+    teachers.set(teacherId, {
+      status: "waiting",
+      matchedRoom: null,
+      teacherUrl: null,
+      updatedAt: now(),
+    });
     teacherQueue.push(teacherId);
   }
   return res.json({ ok: true });
 });
 
 app.post("/api/teacher/offline", (req, res) => {
-  const teacherId = (req.body && String(req.body.teacherId || "")) || "";
+  const teacherId = String(req.body?.teacherId || "").trim();
   if (!teacherId) return res.status(400).json({ ok: false, error: "missing teacherId" });
 
-  teachersOnline.delete(teacherId);
-  // lazy removal from queue
+  teachers.delete(teacherId);
   return res.json({ ok: true });
 });
 
+// teacher polls for match result
+app.post("/api/teacher/poll", (req, res) => {
+  const teacherId = String(req.body?.teacherId || "").trim();
+  if (!teacherId) return res.status(400).json({ ok: false, error: "missing teacherId" });
+
+  const t = teachers.get(teacherId);
+  if (!t) return res.json({ ok: true, status: "offline" });
+
+  return res.json({
+    ok: true,
+    status: t.status,
+    matchedRoom: t.matchedRoom,
+    teacherUrl: t.teacherUrl,
+  });
+});
+
+// student requests match
 app.post("/api/match", (req, res) => {
-  // pick first active teacher
   let picked = null;
   while (teacherQueue.length) {
-    const t = teacherQueue.shift();
-    if (teachersOnline.has(t)) {
-      picked = t;
+    const id = teacherQueue.shift();
+    const t = teachers.get(id);
+    if (t && t.status === "waiting") {
+      picked = id;
       break;
     }
   }
 
-  if (!picked) {
-    return res.json({ ok: false, reason: "no_teacher_available" });
-  }
+  if (!picked) return res.json({ ok: false, reason: "no_teacher_available" });
 
-  // mark teacher busy by removing from online
-  teachersOnline.delete(picked);
-
+  const base = getBase(req);
   const room = genRoomCode();
   const teacherClientId = genId("t");
   const studentClientId = genId("s");
 
-  const base = req.protocol + "://" + req.get("host");
-
-  const teacherUrl = `${base}/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(teacherClientId)}&label=${encodeURIComponent("Teacher")}`;
+  const teacherUrl = `${base}/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(teacherClientId)}&label=${encodeURIComponent("Teacher")}&teacherId=${encodeURIComponent(picked)}`;
   const studentUrl = `${base}/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(studentClientId)}&label=${encodeURIComponent("Student")}`;
 
-  return res.json({
-    ok: true,
-    room,
+  teachers.set(picked, {
+    status: "matched",
+    matchedRoom: room,
     teacherUrl,
-    studentUrl,
+    updatedAt: now(),
   });
+
+  return res.json({ ok: true, room, teacherUrl, studentUrl });
 });
 
+// end session and put teacher back online
+app.post("/api/session/end", (req, res) => {
+  const teacherId = String(req.body?.teacherId || "").trim();
+  if (!teacherId) return res.status(400).json({ ok: false, error: "missing teacherId" });
+
+  teachers.set(teacherId, {
+    status: "waiting",
+    matchedRoom: null,
+    teacherUrl: null,
+    updatedAt: now(),
+  });
+  teacherQueue.push(teacherId);
+
+  return res.json({ ok: true });
+});
+
+// websocket
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url, "http://localhost");
   const room = (url.searchParams.get("room") || "").trim() || "ROOM";
-  const clientId =
-    (url.searchParams.get("clientId") || "").trim() ||
-    ("c" + Math.random().toString(16).slice(2, 10));
+  const clientId = (url.searchParams.get("clientId") || "").trim() || ("c" + Math.random().toString(16).slice(2, 10));
 
   const roomState = getRoom(room);
 
-  // reclaim
   for (const [sock, id] of roomState.clientIdBySocket.entries()) {
     if (id === clientId && sock !== ws) {
       try { sock.close(4001, "reclaimed"); } catch {}
@@ -188,7 +215,6 @@ wss.on("connection", (ws, req) => {
   ws.on("message", (raw) => {
     let msg;
     try { msg = JSON.parse(raw.toString("utf8")); } catch { return; }
-
     const type = msg.type || "";
 
     if (type === "hello") {
@@ -198,28 +224,17 @@ wss.on("connection", (ws, req) => {
 
     if (type === "draw" || type === "clear") {
       if (!isParticipant(roomState, ws)) return;
-      for (const s of roomState.sockets) {
-        if (s !== ws) safeSend(s, msg);
-      }
+      for (const s of roomState.sockets) if (s !== ws) safeSend(s, msg);
       return;
     }
 
     const voiceTypes = new Set([
-      "voice_request",
-      "voice_accept",
-      "voice_reject",
-      "voice_offer",
-      "voice_answer",
-      "voice_ice",
-      "voice_stop",
+      "voice_request","voice_accept","voice_reject","voice_offer","voice_answer","voice_ice","voice_stop"
     ]);
 
     if (voiceTypes.has(type)) {
-      // voice도 참가자만
       if (!isParticipant(roomState, ws)) return;
-      for (const s of roomState.sockets) {
-        if (s !== ws) safeSend(s, msg);
-      }
+      for (const s of roomState.sockets) if (s !== ws) safeSend(s, msg);
       return;
     }
   });
