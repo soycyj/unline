@@ -1,12 +1,19 @@
 // server.js
-// Unline drawing + room state + spectators + voice signaling (WebRTC)
-// Based on your current ws + Upstash Redis architecture.
+// Unline: WebSocket drawing sync + spectator mode + (optional) 1:1 voice signaling.
+// - Room state persists across restarts via Upstash Redis (strokes + minimal meta).
+// - First two connections per room are participants; additional are spectators.
+// - Spectators can watch but cannot draw or use voice.
+// - Voice starts only when a participant clicks "Start voice".
 
 import http from "http";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
 import { Redis } from "@upstash/redis";
 
 /* Config */
+
 const PORT = Number(process.env.PORT || 8080);
 
 const redis = new Redis({
@@ -14,24 +21,24 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// Room persistence
 const ROOM_TTL_SECONDS = 60 * 60 * 24;
-const MAX_ROOM_STROKES = 5000;
-
-// Limits
+const MAX_ROOM_STROKES = 8000;
 const MAX_MSG_BYTES = 256 * 1024;
+
 const ROOM_CODE_RE = /^[A-Z0-9]{4,8}$/;
 
 const MAX_CONN_PER_IP = 20;
 const MAX_CLIENTS_PER_ROOM = 30;
-const MAX_PARTICIPANTS_PER_ROOM = 2;
 
 const WINDOW_MS = 5000;
 const MAX_EVENTS_PER_5S_PER_IP = 2000;
 
-// Voice ICE (Metered)
-const METERED_BASE_URL = (process.env.METERED_BASE_URL || "").trim();
-const METERED_SECRET_KEY = (process.env.METERED_SECRET_KEY || "").trim();
+// Metered TURN (set via Render env vars)
+// NOTE: These values are returned to participants ONLY after they click "Start voice".
+const TURN_HOST = (process.env.METERED_TURN_HOST || "").trim();
+const TURN_USERNAME = (process.env.METERED_TURN_USERNAME || "").trim();
+const TURN_CREDENTIAL = (process.env.METERED_TURN_CREDENTIAL || "").trim();
+const STUN_HOST = (process.env.METERED_STUN_HOST || "stun.relay.metered.ca").trim();
 
 /* Helpers */
 
@@ -55,15 +62,18 @@ function roomKey(roomCode) {
   return `room:${roomCode}`;
 }
 
+function roomMetaKey(roomCode) {
+  return `roommeta:${roomCode}`;
+}
+
 async function touchRoom(roomCode) {
   await redis.expire(roomKey(roomCode), ROOM_TTL_SECONDS);
+  await redis.expire(roomMetaKey(roomCode), ROOM_TTL_SECONDS);
 }
 
 function wsSend(ws, obj) {
   if (ws.readyState !== 1) return;
-  try {
-    ws.send(JSON.stringify(obj));
-  } catch {}
+  ws.send(JSON.stringify(obj));
 }
 
 function bytesOf(data) {
@@ -78,10 +88,34 @@ function getIP(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
-function httpBaseFromWsUrl(wsUrl) {
-  // wss://host -> https://host, ws://host -> http://host
-  if (!wsUrl) return "";
-  return wsUrl.replace(/^wss:/i, "https:").replace(/^ws:/i, "http:");
+function getIceServers() {
+  // If TURN is not configured, return an empty list. The client will still try P2P.
+  if (!TURN_HOST || !TURN_USERNAME || !TURN_CREDENTIAL) return [];
+
+  // Conservative, network-friendly defaults.
+  return [
+    { urls: `stun:${STUN_HOST}:80` },
+    {
+      urls: `turn:${TURN_HOST}:80`,
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL,
+    },
+    {
+      urls: `turn:${TURN_HOST}:80?transport=tcp`,
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL,
+    },
+    {
+      urls: `turn:${TURN_HOST}:443`,
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL,
+    },
+    {
+      urls: `turns:${TURN_HOST}:443?transport=tcp`,
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL,
+    },
+  ];
 }
 
 /* IP state */
@@ -112,6 +146,7 @@ function allowIpEvent(ip) {
 
 /* Rooms in memory */
 
+// roomCode -> { strokes: [], clients:Set(ws), participants:[ws|null, ws|null] }
 const rooms = new Map();
 
 function getRoom(roomCode) {
@@ -119,15 +154,18 @@ function getRoom(roomCode) {
     rooms.set(roomCode, {
       strokes: [],
       clients: new Set(),
-      participants: new Set(),
-      spectators: new Set(),
-      session: {
-        state: "idle", // idle | trial | continued
-        trialStartedAt: null,
-      },
+      participants: [null, null],
     });
   }
   return rooms.get(roomCode);
+}
+
+function otherParticipant(room, ws) {
+  if (!room) return null;
+  for (const p of room.participants) {
+    if (p && p !== ws) return p;
+  }
+  return null;
 }
 
 function broadcast(roomCode, obj) {
@@ -136,205 +174,90 @@ function broadcast(roomCode, obj) {
   for (const client of room.clients) wsSend(client, obj);
 }
 
-function broadcastToParticipants(roomCode, obj, exceptWs = null) {
-  const room = rooms.get(roomCode);
-  if (!room) return;
-  for (const p of room.participants) {
-    if (p !== exceptWs) wsSend(p, obj);
-  }
-}
-
-function roomCounts(roomCode) {
-  const room = rooms.get(roomCode);
-  const total = room ? room.clients.size : 0;
-  const participants = room ? room.participants.size : 0;
-  const spectators = room ? room.spectators.size : 0;
-  return { total, participants, spectators };
-}
-
 function broadcastPeople(roomCode) {
-  const { total, participants, spectators } = roomCounts(roomCode);
   const room = rooms.get(roomCode);
-  const sessionState = room?.session?.state || "idle";
-  const trialStartedAt = room?.session?.trialStartedAt || null;
+  const count = room ? room.clients.size : 0;
+  const participants = room ? room.participants.filter(Boolean).length : 0;
+  broadcast(roomCode, { type: "status", roomCode, count, participants });
+}
 
-  broadcast(roomCode, {
-    type: "status",
+async function saveMeta(roomCode, room) {
+  const meta = {
     roomCode,
-    count: total,              // keep backward compatible
-    participants,
-    spectators,
-    sessionState,
-    trialStartedAt,
-  });
-}
-
-/* Persistence format */
-
-function normalizeSavedRoom(saved) {
-  // Backward compatible:
-  // - saved can be array (strokes only)
-  // - or object { v:2, strokes:[], session:{...} }
-  if (Array.isArray(saved)) {
-    return {
-      v: 2,
-      strokes: saved,
-      session: { state: "idle", trialStartedAt: null },
-    };
-  }
-  if (saved && typeof saved === "object") {
-    const strokes = Array.isArray(saved.strokes) ? saved.strokes : [];
-    const session = saved.session && typeof saved.session === "object" ? saved.session : {};
-    const state = typeof session.state === "string" ? session.state : "idle";
-    const trialStartedAt = typeof session.trialStartedAt === "number" ? session.trialStartedAt : null;
-    return {
-      v: 2,
-      strokes,
-      session: { state, trialStartedAt },
-    };
-  }
-  return { v: 2, strokes: [], session: { state: "idle", trialStartedAt: null } };
-}
-
-async function persistRoom(roomCode) {
-  const room = rooms.get(roomCode);
-  if (!room) return;
-  const payload = {
-    v: 2,
-    strokes: room.strokes,
-    session: room.session,
+    updatedAt: now(),
+    // "active" means 2 participants present
+    status: room.participants.filter(Boolean).length === 2 ? "active" : "quiet",
+    participants: room.participants.filter(Boolean).length,
+    clients: room.clients.size,
   };
-  await redis.set(roomKey(roomCode), payload, { ex: ROOM_TTL_SECONDS });
+  await redis.set(roomMetaKey(roomCode), meta, { ex: ROOM_TTL_SECONDS });
+  await touchRoom(roomCode);
 }
 
-/* Voice ICE tokens (single-use) */
+/* Static file server */
 
-const iceTokens = new Map(); // token -> { roomCode, wsId, exp }
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-function randomToken() {
-  // Not crypto-strong, but sufficient for short-lived, single-use tokens.
-  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-}
-
-function issueIceToken(ws) {
-  const token = randomToken();
-  iceTokens.set(token, {
-    roomCode: ws._roomCode,
-    wsId: ws._id,
-    exp: now() + 60_000, // 60s
+function send(res, code, type, body) {
+  res.writeHead(code, {
+    "content-type": type,
+    "cache-control": "no-store",
   });
-  return token;
+  res.end(body);
 }
 
-function consumeIceToken(token) {
-  const item = iceTokens.get(token);
-  if (!item) return null;
-  iceTokens.delete(token);
-  if (item.exp < now()) return null;
-  return item;
+function serveFile(res, filePath, type) {
+  try {
+    const data = fs.readFileSync(filePath);
+    send(res, 200, type, data);
+  } catch {
+    send(res, 404, "text/plain; charset=utf-8", "not found");
+  }
 }
 
-/* Server */
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const pathname = url.pathname;
 
-const server = http.createServer(async (req, res) => {
-  // Health check
-  if (req.url === "/" || req.url?.startsWith("/?")) {
-    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
-    res.end("ok");
+  if (pathname === "/health") {
+    send(res, 200, "text/plain; charset=utf-8", "ok");
     return;
   }
 
-  // ICE config endpoint for WebRTC
-  // /ice?token=...
-  if (req.url && req.url.startsWith("/ice")) {
-    const u = new URL(req.url, "http://localhost");
-    const token = (u.searchParams.get("token") || "").trim();
-    const consumed = consumeIceToken(token);
-
-    if (!consumed) {
-      res.writeHead(403, { "content-type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ error: "invalid token" }));
-      return;
-    }
-
-    // If Metered env not set, return public STUN only (works in many networks, not all)
-    if (!METERED_BASE_URL || !METERED_SECRET_KEY) {
-      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({
-        iceServers: [
-          { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-        ],
-      }));
-      return;
-    }
-
-    try {
-      // Metered REST API flow:
-      // Many Metered setups accept:
-      // POST {base}/api/v1/turn/credential?apiKey=SECRET
-      // returning { username, credential, ttl, urls:[...] } or { iceServers:[...] }
-      //
-      // We keep this flexible: if response contains iceServers, use it; otherwise build one.
-      const endpoint = `${METERED_BASE_URL.replace(/\/$/, "")}/api/v1/turn/credential?apiKey=${encodeURIComponent(METERED_SECRET_KEY)}`;
-      const r = await fetch(endpoint, { method: "POST" });
-      if (!r.ok) throw new Error(`metered bad status ${r.status}`);
-      const data = await r.json();
-
-      let iceServers = null;
-
-      if (data && Array.isArray(data.iceServers)) {
-        iceServers = data.iceServers;
-      } else if (data && data.username && data.credential && Array.isArray(data.urls)) {
-        iceServers = [{ urls: data.urls, username: data.username, credential: data.credential }];
-      } else if (data && data.username && data.credential && data.url) {
-        iceServers = [{ urls: [data.url], username: data.username, credential: data.credential }];
-      }
-
-      if (!iceServers) {
-        // Fallback if Metered response shape differs
-        iceServers = [
-          { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-        ];
-      }
-
-      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ iceServers }));
-      return;
-    } catch (e) {
-      res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({
-        iceServers: [
-          { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-        ],
-        warn: "metered_error_fallback_stun",
-      }));
-      return;
-    }
+  if (pathname === "/" || pathname === "/index.html") {
+    serveFile(res, path.join(__dirname, "index.html"), "text/html; charset=utf-8");
+    return;
   }
 
-  // Default
-  res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-  res.end("not found");
+  if (pathname === "/canvas.html") {
+    serveFile(res, path.join(__dirname, "canvas.html"), "text/html; charset=utf-8");
+    return;
+  }
+
+  send(res, 404, "text/plain; charset=utf-8", "not found");
 });
+
+/* WebSocket */
 
 const wss = new WebSocketServer({ server });
 
-let wsSeq = 0;
-
 wss.on("connection", (ws, req) => {
   const ip = getIP(req);
-  ws._id = `ws_${++wsSeq}`;
   ws._ip = ip;
   ws._joined = false;
   ws._roomCode = "";
-  ws._role = "unknown"; // participant | spectator
+  ws._role = "spectator"; // participant | spectator
+  ws._slot = -1; // 0 or 1 for participants
 
   const st = getIpState(ip);
   st.conns += 1;
 
   if (st.conns > MAX_CONN_PER_IP) {
     st.conns = Math.max(0, st.conns - 1);
-    try { ws.close(1008, "too many connections"); } catch {}
+    try {
+      ws.close(1008, "too many connections");
+    } catch {}
     return;
   }
 
@@ -346,14 +269,14 @@ wss.on("connection", (ws, req) => {
       const room = rooms.get(ws._roomCode);
       if (room) {
         room.clients.delete(ws);
-        room.participants.delete(ws);
-        room.spectators.delete(ws);
+        if (ws._role === "participant" && ws._slot >= 0) {
+          if (room.participants[ws._slot] === ws) room.participants[ws._slot] = null;
+        }
 
         broadcastPeople(ws._roomCode);
+        await saveMeta(ws._roomCode, room);
 
         if (room.clients.size === 0) {
-          // Persist last state and drop memory cache.
-          try { await persistRoom(ws._roomCode); } catch {}
           rooms.delete(ws._roomCode);
         }
       }
@@ -392,49 +315,49 @@ wss.on("connection", (ws, req) => {
       if (ws._joined) return;
 
       const room = getRoom(roomCode);
-      const wasActive = room.clients.size > 0;
 
       if (room.clients.size >= MAX_CLIENTS_PER_ROOM) {
         wsSend(ws, { type: "warn", reason: "room full" });
         return;
       }
 
+      // Assign role: first 2 are participants, rest spectators
+      let role = "spectator";
+      let slot = -1;
+      for (let i = 0; i < 2; i += 1) {
+        if (!room.participants[i]) {
+          room.participants[i] = ws;
+          role = "participant";
+          slot = i;
+          break;
+        }
+      }
+
       ws._joined = true;
       ws._roomCode = roomCode;
+      ws._role = role;
+      ws._slot = slot;
       room.clients.add(ws);
 
-      // Load persisted data
-      const savedRaw = await redis.get(roomKey(roomCode));
-      const saved = normalizeSavedRoom(savedRaw);
-
-      if (!wasActive) {
-        room.strokes = saved.strokes || [];
-        room.session = saved.session || { state: "idle", trialStartedAt: null };
-      } else {
-        // If already active, keep memory but ensure session exists
-        if (room.strokes.length === 0 && Array.isArray(saved.strokes)) room.strokes = saved.strokes;
-        if (!room.session) room.session = saved.session || { state: "idle", trialStartedAt: null };
+      // Load strokes from Redis only once per cold room
+      const saved = await redis.get(roomKey(roomCode));
+      if (room.strokes.length === 0 && Array.isArray(saved)) {
+        room.strokes = saved;
       }
 
-      // Role assignment: first 2 = participants, rest = spectators
-      if (room.participants.size < MAX_PARTICIPANTS_PER_ROOM) {
-        room.participants.add(ws);
-        ws._role = "participant";
-      } else {
-        room.spectators.add(ws);
-        ws._role = "spectator";
-      }
+      const meta = await redis.get(roomMetaKey(roomCode));
+      const status = meta && typeof meta === "object" && meta.status ? meta.status : "quiet";
 
       wsSend(ws, {
-        type: "role",
+        type: "init",
         roomCode,
-        role: ws._role,
-        sessionState: room.session.state,
+        role,
+        slot,
+        status,
+        strokes: room.strokes,
       });
 
-      wsSend(ws, { type: "init", roomCode, strokes: room.strokes, session: room.session });
-
-      await touchRoom(roomCode);
+      await saveMeta(roomCode, room);
       broadcastPeople(roomCode);
       return;
     }
@@ -451,52 +374,15 @@ wss.on("connection", (ws, req) => {
 
     const room = getRoom(roomCode);
 
-    // Spectators restrictions
-    const isSpectator = ws._role === "spectator";
-
-    // Session controls
-    if (type === "session") {
-      if (isSpectator) return;
-
-      const action = String(msg.action || "");
-      if (action === "start_trial") {
-        if (room.session.state === "trial") return;
-        room.session.state = "trial";
-        room.session.trialStartedAt = now();
-        await persistRoom(roomCode);
-        broadcast(roomCode, { type: "session", roomCode, session: room.session });
-        broadcastPeople(roomCode);
+    // Drawing permissions
+    if (type === "stroke" || type === "clear") {
+      if (ws._role !== "participant") {
+        wsSend(ws, { type: "warn", reason: "spectators cannot draw" });
         return;
       }
-      if (action === "continue") {
-        room.session.state = "continued";
-        await persistRoom(roomCode);
-        broadcast(roomCode, { type: "session", roomCode, session: room.session });
-        broadcastPeople(roomCode);
-        return;
-      }
-      if (action === "end") {
-        room.session.state = "idle";
-        room.session.trialStartedAt = null;
-        await persistRoom(roomCode);
-        broadcast(roomCode, { type: "session", roomCode, session: room.session });
-        broadcastPeople(roomCode);
-        return;
-      }
-      return;
     }
 
-    // ICE token request (participants only)
-    if (type === "ice_token") {
-      if (isSpectator) return;
-      const token = issueIceToken(ws);
-      wsSend(ws, { type: "ice_token", token, httpBase: httpBaseFromWsUrl(msg.wsUrl || "") });
-      return;
-    }
-
-    // Drawing
     if (type === "stroke") {
-      if (isSpectator) return;
       const stroke = msg.stroke;
       if (!stroke || typeof stroke !== "object") return;
 
@@ -505,37 +391,70 @@ wss.on("connection", (ws, req) => {
         room.strokes.splice(0, room.strokes.length - MAX_ROOM_STROKES);
       }
 
-      await persistRoom(roomCode);
+      await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
+      await saveMeta(roomCode, room);
+
       broadcast(roomCode, { type: "stroke", roomCode, stroke });
       return;
     }
 
     if (type === "clear") {
-      if (isSpectator) return;
       room.strokes = [];
-      await persistRoom(roomCode);
+      await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
+      await saveMeta(roomCode, room);
+
       broadcast(roomCode, { type: "clear", roomCode });
       return;
     }
 
-    // Voice signaling: only between the two participants
-    if (type === "voice") {
-      if (isSpectator) return;
+    // Voice signaling (participants only)
+    const voiceTypes = new Set([
+      "voice_request",
+      "voice_accept",
+      "voice_reject",
+      "voice_offer",
+      "voice_answer",
+      "voice_candidate",
+      "voice_end",
+      "get_ice",
+    ]);
 
-      // forward to the other participant
-      const payload = {
-        type: "voice",
-        roomCode,
-        from: ws._id,
-        action: String(msg.action || ""),
-        data: msg.data || null,
-      };
-      broadcastToParticipants(roomCode, payload, ws);
+    if (voiceTypes.has(type)) {
+      if (ws._role !== "participant") {
+        wsSend(ws, { type: "warn", reason: "spectators cannot use voice" });
+        return;
+      }
+
+      if (type === "get_ice") {
+        wsSend(ws, { type: "ice", roomCode, iceServers: getIceServers() });
+        return;
+      }
+
+      const peer = otherParticipant(room, ws);
+      if (!peer) {
+        wsSend(ws, { type: "warn", reason: "no peer" });
+        return;
+      }
+
+      // Pass-through signaling payload (offer/answer/candidate)
+      if (type === "voice_offer" || type === "voice_answer" || type === "voice_candidate") {
+        wsSend(peer, {
+          type,
+          roomCode,
+          fromSlot: ws._slot,
+          payload: msg.payload || null,
+        });
+        return;
+      }
+
+      // Simple control messages
+      wsSend(peer, { type, roomCode, fromSlot: ws._slot });
       return;
     }
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`WS server listening on port ${PORT}`);
+  // eslint-disable-next-line no-console
+  console.log(`Unline server listening on :${PORT}`);
 });
