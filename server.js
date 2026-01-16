@@ -142,12 +142,14 @@ app.post("/api/match", (req, res) => {
     `&label=${encodeURIComponent("Teacher")}` +
     `&teacherId=${encodeURIComponent(picked)}` +
     `&sessionId=${encodeURIComponent(sessionId)}`;
+    `&trialEndsAt=${encodeURIComponent(String(trialEndsAt))}`;
 
   const studentUrl =
     `${base}/canvas.html?room=${encodeURIComponent(room)}` +
     `&clientId=${encodeURIComponent(studentClientId)}` +
     `&label=${encodeURIComponent("Student")}` +
     `&sessionId=${encodeURIComponent(sessionId)}`;
+    `&trialEndsAt=${encodeURIComponent(String(trialEndsAt))}`;
 
   teachers.set(picked, { status: "matched", teacherUrl, updatedAt: now() });
 
