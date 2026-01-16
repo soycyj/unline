@@ -15,6 +15,7 @@
       --btn2:#2b3242;
       --danger:#ef4444;
       --ok:#22c55e;
+      --warn:#f59e0b;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -50,8 +51,9 @@
       background:rgba(20,24,33,0.6);
       font-size:12px;
       color:var(--muted);
+      white-space:nowrap;
     }
-    .pill strong{color:var(--text);font-weight:800}
+    .pill strong{color:var(--text);font-weight:900}
     .status{
       padding:6px 10px;
       border-radius:999px;
@@ -62,6 +64,8 @@
     }
     .online{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
     .offline{color:#450a0a;background:rgba(239,68,68,0.16);border-color:rgba(239,68,68,0.35)}
+    .trial{color:#1f2937;background:rgba(245,158,11,0.22);border-color:rgba(245,158,11,0.45)}
+    .learning{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
     button{
       padding:9px 12px;
       border:1px solid var(--line);
@@ -69,7 +73,7 @@
       cursor:pointer;
       color:var(--text);
       background:var(--btn2);
-      font-weight:800;
+      font-weight:900;
       font-size:13px;
     }
     button.primary{background:var(--btn);border-color:rgba(31,111,235,0.7)}
@@ -83,7 +87,7 @@
       border:1px solid var(--line);
       background:rgba(10,12,16,0.55);
       color:var(--text);
-      font-weight:800;
+      font-weight:900;
       font-size:13px;
       outline:none;
       width:160px;
@@ -94,7 +98,7 @@
       border:1px solid var(--line);
       background:rgba(10,12,16,0.55);
       color:var(--text);
-      font-weight:800;
+      font-weight:900;
       font-size:13px;
       outline:none;
     }
@@ -158,6 +162,41 @@
       line-height:1.55;
       display:none;
     }
+
+    /* Trial decision modal */
+    .modalWrap{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      z-index:50;
+    }
+    .modal{
+      width:min(520px, 94vw);
+      background:rgba(20,24,33,0.96);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:16px;
+    }
+    .modal h2{
+      margin:0 0 8px;
+      font-size:16px;
+      font-weight:900;
+    }
+    .modal p{
+      margin:0 0 14px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.6;
+    }
+    .modal .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
     @media (max-width:1060px){
       .wrap{grid-template-columns:1fr}
       input{width:140px}
@@ -168,6 +207,8 @@
   <div class="topbar">
     <div class="left">
       <div id="connStatus" class="status offline">Offline</div>
+      <div id="sessionPill" class="pill">Session <strong id="sessionTxt">None</strong></div>
+      <div id="trialPill" class="pill" style="display:none">Trial ends in <strong id="trialCountdown">10:00</strong></div>
       <div class="pill">Room <strong id="roomTxt"></strong></div>
       <div class="pill">Role <strong id="roleTxt">Unknown</strong></div>
       <div class="pill">Visitors <strong id="visitorsTxt">0</strong></div>
@@ -178,7 +219,6 @@
       <button id="goRoomBtn">Go</button>
       <button id="clearBtn" class="danger">Clear</button>
       <button id="backBtn" class="ghost">Back</button>
-      <button id="endSessionBtn" class="danger" style="display:none">End session</button>
     </div>
   </div>
 
@@ -208,7 +248,10 @@
 
         <div class="banner" id="viewerBanner">
           Viewer 모드입니다. 현재 room에서 그리기와 음성은 참가자만 가능합니다.
-          참가자 링크로 다시 입장하면 바로 사용 가능합니다.
+        </div>
+
+        <div class="banner" id="trialBanner">
+          This is a 10-minute trial session. Feel free to speak and draw together.
         </div>
 
         <p class="small" id="toolInfo"></p>
@@ -233,6 +276,19 @@
     </div>
   </div>
 
+  <div class="modalWrap" id="decisionModal">
+    <div class="modal">
+      <h2>Session ended</h2>
+      <p>How did it feel? If you want, you can continue with the same coach with no time limit.</p>
+      <div class="actions">
+        <button class="primary" id="btnContinue">Continue with this coach</button>
+        <button id="btnRetry">Try another coach</button>
+        <button class="danger" id="btnEnd">End here</button>
+      </div>
+      <p class="small" id="decisionHint"></p>
+    </div>
+  </div>
+
   <script>
     const $ = (id) => document.getElementById(id);
 
@@ -249,24 +305,20 @@
       }
     }
 
-    function genClientId(){
-      return "c" + Math.random().toString(16).slice(2,10);
-    }
-
     const qs = new URLSearchParams(location.search);
-    const teacherId = (qs.get("teacherId") || "").trim();
     let room = (qs.get("room") || "").trim();
     if(!room) room = "TEST";
 
     const label = (qs.get("label") || "").trim();
     $("labelTxt").textContent = label || "None";
 
-    const userProvidedClientId = !!(qs.get("clientId") || "").trim();
+    const sessionIdParam = (qs.get("sessionId") || "").trim();
 
+    const userProvidedClientId = !!(qs.get("clientId") || "").trim();
     let clientId = (qs.get("clientId") || "").trim();
     if(!clientId){
       const key = `unline_auto_clientId_${room}`;
-      clientId = localStorage.getItem(key) || genClientId();
+      clientId = localStorage.getItem(key) || ("c" + Math.random().toString(16).slice(2,10));
       localStorage.setItem(key, clientId);
     }
 
@@ -276,22 +328,126 @@
     let currentRole = "Unknown";
     let currentVisitors = 0;
 
+    // session state from server
+    let sessionMode = null; // trial | learning | null
+    let trialEndsAt = null; // epoch ms
+    let sessionId = null;
+
+    let trialTick = null;
+    let trialEndedUiShown = false;
+
+    function isStudent(){
+      return (label || "").toLowerCase() === "student";
+    }
+
     function canDraw(){
-      return currentRole === "Participant";
+      return currentRole === "Participant" && sessionMode !== "trial_ended";
     }
 
     function canVoice(){
-      return userProvidedClientId && currentRole === "Participant";
+      return userProvidedClientId && currentRole === "Participant" && sessionMode !== "trial_ended";
+    }
+
+    function applySessionUi(){
+      const sessionTxt = $("sessionTxt");
+      const sessionPill = $("sessionPill");
+      const trialPill = $("trialPill");
+
+      if(sessionMode === "trial"){
+        sessionTxt.textContent = "Trial";
+        sessionPill.className = "pill";
+        $("trialBanner").style.display = "block";
+        trialPill.style.display = "inline-flex";
+      } else if(sessionMode === "learning"){
+        sessionTxt.textContent = "Learning";
+        sessionPill.className = "pill";
+        $("trialBanner").style.display = "none";
+        trialPill.style.display = "none";
+      } else {
+        sessionTxt.textContent = "None";
+        sessionPill.className = "pill";
+        $("trialBanner").style.display = "none";
+        trialPill.style.display = "none";
+      }
+    }
+
+    function showDecisionModal(){
+      if(trialEndedUiShown) return;
+      trialEndedUiShown = true;
+
+      sessionMode = "trial_ended";
+      applySessionUi();
+      updateVoiceUi();
+      updateToolUi();
+
+      $("decisionModal").style.display = "flex";
+
+      if(!isStudent()){
+        $("decisionHint").textContent = "Waiting for the student to choose.";
+        $("btnContinue").disabled = true;
+        $("btnRetry").disabled = true;
+        $("btnEnd").disabled = true;
+      } else {
+        $("decisionHint").textContent = "";
+        $("btnContinue").disabled = false;
+        $("btnRetry").disabled = false;
+        $("btnEnd").disabled = false;
+      }
+
+      // stop voice in UI
+      if(callActive){
+        send("voice_stop", {});
+        teardownVoice("Trial ended");
+      }
+    }
+
+    function startTrialCountdown(){
+      if(trialTick) clearInterval(trialTick);
+      if(!trialEndsAt) return;
+
+      const tick = () => {
+        const ms = trialEndsAt - Date.now();
+        if(ms <= 0){
+          $("trialCountdown").textContent = "00:00";
+          clearInterval(trialTick);
+          trialTick = null;
+          showDecisionModal();
+          return;
+        }
+        const s = Math.floor(ms / 1000);
+        const mm = String(Math.floor(s / 60)).padStart(2,"0");
+        const ss = String(s % 60).padStart(2,"0");
+        $("trialCountdown").textContent = `${mm}:${ss}`;
+      };
+
+      tick();
+      trialTick = setInterval(tick, 250);
     }
 
     function applyRoomState(payload){
       if(payload && payload.role) currentRole = payload.role;
       if(payload && typeof payload.visitors === "number") currentVisitors = payload.visitors;
 
+      // session fields
+      sessionMode = payload.sessionMode || null;
+      trialEndsAt = payload.trialEndsAt || null;
+      sessionId = payload.sessionId || sessionIdParam || null;
+
       $("roleTxt").textContent = currentRole;
       $("visitorsTxt").textContent = String(currentVisitors);
 
       $("viewerBanner").style.display = (currentRole !== "Participant") ? "block" : "none";
+
+      applySessionUi();
+
+      if(sessionMode === "trial" && trialEndsAt){
+        startTrialCountdown();
+      } else {
+        if(trialTick) clearInterval(trialTick);
+        trialTick = null;
+        $("decisionModal").style.display = "none";
+        trialEndedUiShown = false;
+      }
 
       updateVoiceUi();
       updateToolUi();
@@ -302,6 +458,8 @@
         $("voiceHint").textContent = "voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다";
       }else if(currentRole !== "Participant"){
         $("voiceHint").textContent = "현재 role이 Participant가 아닙니다";
+      }else if(sessionMode === "trial_ended"){
+        $("voiceHint").textContent = "Trial이 종료되었습니다";
       }else{
         $("voiceHint").textContent = "";
       }
@@ -376,6 +534,7 @@
       next.searchParams.set("room", room);
       if(userProvidedClientId) next.searchParams.set("clientId", clientId);
       if(label) next.searchParams.set("label", label);
+      if(sessionIdParam) next.searchParams.set("sessionId", sessionIdParam);
       history.replaceState(null, "", next.toString());
 
       connect();
@@ -388,35 +547,39 @@
     });
 
     $("backBtn").addEventListener("click", () => { location.href = "/"; });
-    if(teacherId){
-  const btn = document.getElementById("endSessionBtn");
-  btn.style.display = "inline-block";
-  btn.addEventListener("click", async () => {
-    const ok = confirm("수업을 종료하고 다시 대기 상태로 돌아갈까요?");
-    if(!ok) return;
 
-    await fetch("/api/session/end", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ teacherId })
+    // Decision modal actions
+    async function postDecision(decision){
+      const payload = { room, sessionId: sessionId || sessionIdParam, decision };
+      const res = await fetch("/api/session/decision", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      return await res.json();
+    }
+
+    $("btnContinue").addEventListener("click", async () => {
+      const out = await postDecision("continue");
+      if(out.ok){
+        $("decisionModal").style.display = "none";
+        trialEndedUiShown = false;
+        send("hello", {});
+      }
     });
 
-    location.href = "/";
-  });
-}
+    $("btnRetry").addEventListener("click", async () => {
+      await postDecision("retry");
+      location.href = "/";
+    });
+
+    $("btnEnd").addEventListener("click", async () => {
+      await postDecision("end");
+      location.href = "/";
+    });
 
     // tools
-    const swatchColors = [
-      "#E8EEF9",
-      "#22C55E",
-      "#3B82F6",
-      "#A855F7",
-      "#F59E0B",
-      "#EF4444",
-      "#14B8A6",
-      "#F472B6"
-    ];
-
+    const swatchColors = ["#E8EEF9","#22C55E","#3B82F6","#A855F7","#F59E0B","#EF4444","#14B8A6","#F472B6"];
     let tool = "pen";
     let penColor = swatchColors[0];
     let penWidth = Number($("sizeSel").value);
@@ -434,7 +597,6 @@
         "Tool " + tool.toUpperCase() +
         "  Size " + penWidth +
         (tool === "pen" ? "  Color " + penColor : "");
-
       $("toolInfo").textContent = text;
 
       const disabled = !canDraw();
@@ -443,7 +605,6 @@
       $("sizeSel").disabled = disabled;
       $("clearBtn").disabled = disabled;
 
-      // color only for pen
       const sw = $("swatches").querySelectorAll("button");
       sw.forEach(b => b.disabled = disabled || tool !== "pen");
     }
@@ -474,7 +635,6 @@
     });
 
     renderSwatches();
-    updateToolUi();
 
     // drawing
     const canvas = $("board");
@@ -542,15 +702,9 @@
       if(!drawing) return;
       const p = posFromEvent(e);
 
-      const payload = {
-        mode: tool,
-        color: penColor,
-        w: penWidth,
-      };
-
+      const payload = { mode: tool, color: penColor, w: penWidth };
       stroke(last, p, payload);
       send("draw", { a:last, b:p, ...payload });
-
       last = p;
     }
 
@@ -559,10 +713,7 @@
       last = null;
     }
 
-    canvas.addEventListener("pointerdown", (e) => {
-      canvas.setPointerCapture(e.pointerId);
-      start(e);
-    });
+    canvas.addEventListener("pointerdown", (e) => { canvas.setPointerCapture(e.pointerId); start(e); });
     canvas.addEventListener("pointermove", move);
     canvas.addEventListener("pointerup", end);
     canvas.addEventListener("pointercancel", end);
@@ -596,10 +747,7 @@
     async function createPeer(){
       pc = new RTCPeerConnection(rtcConfig);
 
-      pc.onicecandidate = (e) => {
-        if(e.candidate) send("voice_ice", { candidate: e.candidate });
-      };
-
+      pc.onicecandidate = (e) => { if(e.candidate) send("voice_ice", { candidate: e.candidate }); };
       pc.ontrack = (e) => {
         const stream = e.streams && e.streams[0];
         if(stream) $("remoteAudio").srcObject = stream;
@@ -610,18 +758,10 @@
     }
 
     $("startVoiceBtn").addEventListener("click", async () => {
-      if(!userProvidedClientId){
-        alert("voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다");
-        return;
-      }
-      if(currentRole !== "Participant"){
-        alert("Participant만 음성을 시작할 수 있습니다");
-        return;
-      }
-      if(callActive){
-        alert("이미 통화가 진행 중입니다");
-        return;
-      }
+      if(!userProvidedClientId){ alert("voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다"); return; }
+      if(currentRole !== "Participant"){ alert("Participant만 음성을 시작할 수 있습니다"); return; }
+      if(sessionMode === "trial_ended"){ alert("Trial이 종료되었습니다"); return; }
+      if(callActive){ alert("이미 통화가 진행 중입니다"); return; }
       setVoiceState("Requesting");
       send("voice_request", {});
     });
@@ -719,6 +859,8 @@
     }
 
     setVoiceState("Idle");
+    updateToolUi();
+    updateVoiceUi();
     connect();
   </script>
 </body>
