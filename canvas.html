@@ -313,6 +313,9 @@
     $("labelTxt").textContent = label || "None";
 
     const sessionIdParam = (qs.get("sessionId") || "").trim();
+    const trialEndsAtParamRaw = (qs.get("trialEndsAt") || "").trim();
+    const trialEndsAtParam = trialEndsAtParamRaw ? Number(trialEndsAtParamRaw) : null;
+
 
     const userProvidedClientId = !!(qs.get("clientId") || "").trim();
     let clientId = (qs.get("clientId") || "").trim();
