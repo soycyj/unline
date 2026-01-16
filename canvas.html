@@ -75,6 +75,17 @@
     button.primary{background:var(--btn);border-color:rgba(31,111,235,0.7)}
     button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
     button:disabled{opacity:0.55;cursor:not-allowed}
+    input{
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(10,12,16,0.55);
+      color:var(--text);
+      font-weight:700;
+      font-size:13px;
+      outline:none;
+      width:160px;
+    }
     .wrap{
       display:grid;
       grid-template-columns:1fr 320px;
@@ -113,20 +124,28 @@
     }
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .small{font-size:12px;color:var(--muted);line-height:1.45;margin:8px 0 0}
-    .log{
-      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
-      font-size:11px;
-      color:rgba(232,238,249,0.8);
-      background:rgba(10,12,16,0.55);
+    .swatches{display:flex;gap:8px;flex-wrap:wrap}
+    .swatch{
+      width:24px;height:24px;border-radius:8px;
       border:1px solid var(--line);
-      border-radius:12px;
-      padding:10px;
-      height:220px;
-      overflow:auto;
-      white-space:pre-wrap;
-      word-break:break-word;
+      cursor:pointer;
+      outline:none;
     }
-    @media (max-width:980px){ .wrap{grid-template-columns:1fr} }
+    .swatch.active{
+      border-color:rgba(232,238,249,0.95);
+      box-shadow:0 0 0 2px rgba(232,238,249,0.25) inset;
+    }
+    select{
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(10,12,16,0.55);
+      color:var(--text);
+      font-weight:700;
+      font-size:13px;
+      outline:none;
+    }
+    @media (max-width:980px){ .wrap{grid-template-columns:1fr} input{width:140px} }
   </style>
 </head>
 <body>
@@ -138,8 +157,10 @@
       <div class="pill">Visitors <strong id="visitorsTxt">0</strong></div>
     </div>
     <div class="right">
-      <button id="backBtn">Back</button>
+      <input id="roomInput" placeholder="Room code" />
+      <button id="goRoomBtn">Go</button>
       <button id="clearBtn">Clear</button>
+      <button id="backBtn">Back</button>
     </div>
   </div>
 
@@ -150,6 +171,24 @@
 
     <div class="side">
       <div class="card">
+        <h3>Pen</h3>
+        <div class="row">
+          <div class="swatches" id="swatches"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="small">Size</div>
+          <select id="sizeSel">
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="5">5</option>
+            <option value="8">8</option>
+            <option value="12">12</option>
+          </select>
+        </div>
+        <p class="small" id="penInfo"></p>
+      </div>
+
+      <div class="card">
         <h3>Voice</h3>
         <div class="row">
           <button class="primary" id="startVoiceBtn">Start voice</button>
@@ -159,27 +198,11 @@
         <audio id="remoteAudio" autoplay playsinline></audio>
         <p class="small" id="voiceHint"></p>
       </div>
-
-      <div class="card">
-        <h3>Debug</h3>
-        <div class="row">
-          <button id="reconnectBtn">Reconnect</button>
-        </div>
-        <p class="small" id="wsUrlTxt"></p>
-        <div class="log" id="log"></div>
-      </div>
     </div>
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-
-    function log(msg){
-      const el = $("log");
-      const line = `[${new Date().toLocaleTimeString()}] ${msg}\n`;
-      el.textContent += line;
-      el.scrollTop = el.scrollHeight;
-    }
 
     function setConn(online){
       const el = $("connStatus");
@@ -199,11 +222,8 @@
     }
 
     const qs = new URLSearchParams(location.search);
-    const room = (qs.get("room") || "").trim();
-    if(!room){
-      alert("room code가 필요합니다");
-      location.href = "/";
-    }
+    let room = (qs.get("room") || "").trim();
+    if(!room){ room = "TEST"; }
 
     const userProvidedClientId = !!(qs.get("clientId") || "").trim();
 
@@ -215,6 +235,7 @@
     }
 
     $("roomTxt").textContent = room;
+    $("roomInput").value = room;
 
     let currentRole = "Unknown";
     let currentVisitors = 0;
@@ -243,14 +264,10 @@
       $("stopVoiceBtn").disabled = !callActive;
     }
 
-    const wsProto = (location.protocol === "https:") ? "wss" : "ws";
-    const currentWsUrl =
-      `${wsProto}://${location.host}/ws` +
-      `?room=${encodeURIComponent(room)}` +
-      `&clientId=${encodeURIComponent(clientId)}`;
-
-    $("wsUrlTxt").textContent = "WS URL " + currentWsUrl;
-    log("WS URL " + currentWsUrl);
+    function buildWsUrl(){
+      const wsProto = (location.protocol === "https:") ? "wss" : "ws";
+      return `${wsProto}://${location.host}/ws?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}`;
+    }
 
     let ws = null;
 
@@ -260,22 +277,16 @@
     }
 
     function connect(){
-      if(ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)){
-        log("WS already open or connecting");
-        return;
-      }
-
-      ws = new WebSocket(currentWsUrl);
+      const wsUrl = buildWsUrl();
+      ws = new WebSocket(wsUrl);
 
       ws.addEventListener("open", () => {
         setConn(true);
-        log("WS open");
         send("hello", {});
       });
 
       ws.addEventListener("close", () => {
         setConn(false);
-        log("WS close");
         currentRole = "Unknown";
         $("roleTxt").textContent = currentRole;
         updateVoiceUi();
@@ -283,7 +294,6 @@
 
       ws.addEventListener("error", () => {
         setConn(false);
-        log("WS error");
       });
 
       ws.addEventListener("message", async (evt) => {
@@ -305,14 +315,76 @@
       });
     }
 
-    $("reconnectBtn").addEventListener("click", () => {
+    function hardReconnectToNewRoom(newRoom){
+      room = newRoom;
+      $("roomTxt").textContent = room;
+      $("roomInput").value = room;
+
       try{ if(ws) ws.close(); }catch(e){}
       ws = null;
-      setConn(false);
+
+      teardownVoice("Idle");
+      clearCanvas(false);
+
+      const next = new URL(location.href);
+      next.searchParams.set("room", room);
+      if(userProvidedClientId) next.searchParams.set("clientId", clientId);
+      history.replaceState(null, "", next.toString());
+
       connect();
+    }
+
+    $("goRoomBtn").addEventListener("click", () => {
+      const newRoom = ($("roomInput").value || "").trim();
+      if(!newRoom) return;
+      hardReconnectToNewRoom(newRoom);
     });
 
     $("backBtn").addEventListener("click", () => { location.href = "/"; });
+
+    // Pen
+    const swatchColors = [
+      "#E8EEF9",
+      "#22C55E",
+      "#3B82F6",
+      "#A855F7",
+      "#F59E0B",
+      "#EF4444",
+      "#14B8A6",
+      "#F472B6"
+    ];
+
+    let penColor = swatchColors[0];
+    let penWidth = Number($("sizeSel").value);
+
+    function setPenInfo(){
+      $("penInfo").textContent = `color ${penColor} size ${penWidth}`;
+    }
+
+    function renderSwatches(){
+      const box = $("swatches");
+      box.textContent = "";
+      for(const c of swatchColors){
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "swatch" + (c === penColor ? " active" : "");
+        b.style.background = c;
+        b.addEventListener("click", () => {
+          penColor = c;
+          renderSwatches();
+          setPenInfo();
+        });
+        box.appendChild(b);
+      }
+    }
+
+    $("sizeSel").addEventListener("change", () => {
+      penWidth = Number($("sizeSel").value);
+      setPenInfo();
+    });
+
+    renderSwatches();
+    setPenInfo();
 
     // Drawing
     const canvas = $("board");
@@ -328,8 +400,6 @@
       ctx.setTransform(dpr,0,0,dpr,0,0);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(232,238,249,0.95)";
     }
     window.addEventListener("resize", resize);
     resize();
@@ -339,7 +409,9 @@
       return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
     }
 
-    function stroke(a, b){
+    function stroke(a, b, color, w){
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
@@ -348,7 +420,9 @@
 
     function applyRemoteStroke(msg){
       if(!msg || !msg.a || !msg.b) return;
-      stroke(msg.a, msg.b);
+      const color = msg.color || "#E8EEF9";
+      const w = Number(msg.w || 3);
+      stroke(msg.a, msg.b, color, w);
     }
 
     function clearCanvas(broadcast){
@@ -360,8 +434,8 @@
     function move(e){
       if(!drawing) return;
       const p = posFromEvent(e);
-      stroke(last, p);
-      send("draw", { a:last, b:p });
+      stroke(last, p, penColor, penWidth);
+      send("draw", { a:last, b:p, color: penColor, w: penWidth });
       last = p;
     }
     function end(){ drawing = false; last = null; }
@@ -423,7 +497,6 @@
       }
       setVoiceState("Requesting");
       send("voice_request", {});
-      log("voice_request sent");
     });
 
     $("stopVoiceBtn").addEventListener("click", () => {
@@ -440,8 +513,7 @@
       if(!ok){ send("voice_reject", { reason:"rejected" }); return; }
 
       send("voice_accept", {});
-      setVoiceState("Accepted waiting offer");
-      log("voice_accept sent");
+      setVoiceState("Accepted");
     }
 
     async function onVoiceAccept(){
@@ -461,12 +533,11 @@
       }
     }
 
-    function onVoiceReject(msg){
+    function onVoiceReject(){
       callActive = false;
       isInitiator = false;
       setVoiceState("Rejected");
       alert("상대가 음성 요청을 거절했습니다");
-      log("voice_reject " + ((msg && msg.reason) || "unknown"));
     }
 
     async function onVoiceOffer(msg){
