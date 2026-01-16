@@ -1,14 +1,4 @@
-// server.js
-// Unline: WebSocket drawing sync + spectator mode + (optional) 1:1 voice signaling.
-// - Room state persists across restarts via Upstash Redis (strokes + minimal meta).
-// - First two connections per room are participants; additional are spectators.
-// - Spectators can watch but cannot draw or use voice.
-// - Voice starts only when a participant clicks "Start voice".
-
 import http from "http";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { WebSocketServer } from "ws";
 import { Redis } from "@upstash/redis";
 
@@ -21,24 +11,24 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
+// Room data retention
 const ROOM_TTL_SECONDS = 60 * 60 * 24;
-const MAX_ROOM_STROKES = 8000;
-const MAX_MSG_BYTES = 256 * 1024;
 
+// Drawing strokes
+const MAX_ROOM_STROKES = 5000;
+
+// Safety
+const MAX_MSG_BYTES = 256 * 1024;
 const ROOM_CODE_RE = /^[A-Z0-9]{4,8}$/;
 
 const MAX_CONN_PER_IP = 20;
-const MAX_CLIENTS_PER_ROOM = 30;
+const MAX_CLIENTS_PER_ROOM = 60; // participants(2) + spectators
 
 const WINDOW_MS = 5000;
 const MAX_EVENTS_PER_5S_PER_IP = 2000;
 
-// Metered TURN (set via Render env vars)
-// NOTE: These values are returned to participants ONLY after they click "Start voice".
-const TURN_HOST = (process.env.METERED_TURN_HOST || "").trim();
-const TURN_USERNAME = (process.env.METERED_TURN_USERNAME || "").trim();
-const TURN_CREDENTIAL = (process.env.METERED_TURN_CREDENTIAL || "").trim();
-const STUN_HOST = (process.env.METERED_STUN_HOST || "stun.relay.metered.ca").trim();
+// Session
+const TRIAL_SECONDS = 10 * 60;
 
 /* Helpers */
 
@@ -59,11 +49,11 @@ function normalizeRoom(code) {
 }
 
 function roomKey(roomCode) {
-  return `room:${roomCode}`;
+  return `room:${roomCode}:strokes`;
 }
 
 function roomMetaKey(roomCode) {
-  return `roommeta:${roomCode}`;
+  return `room:${roomCode}:meta`;
 }
 
 async function touchRoom(roomCode) {
@@ -88,34 +78,34 @@ function getIP(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
-function getIceServers() {
-  // If TURN is not configured, return an empty list. The client will still try P2P.
-  if (!TURN_HOST || !TURN_USERNAME || !TURN_CREDENTIAL) return [];
+function randomRoomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
 
-  // Conservative, network-friendly defaults.
-  return [
-    { urls: `stun:${STUN_HOST}:80` },
-    {
-      urls: `turn:${TURN_HOST}:80`,
-      username: TURN_USERNAME,
-      credential: TURN_CREDENTIAL,
-    },
-    {
-      urls: `turn:${TURN_HOST}:80?transport=tcp`,
-      username: TURN_USERNAME,
-      credential: TURN_CREDENTIAL,
-    },
-    {
-      urls: `turn:${TURN_HOST}:443`,
-      username: TURN_USERNAME,
-      credential: TURN_CREDENTIAL,
-    },
-    {
-      urls: `turns:${TURN_HOST}:443?transport=tcp`,
-      username: TURN_USERNAME,
-      credential: TURN_CREDENTIAL,
-    },
-  ];
+function clampInt(v, min, max) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+function computeTrialEndsAt(meta) {
+  if (!meta || meta.sessionState !== "trial" || !meta.trialStartedAt) return 0;
+  return meta.trialStartedAt + TRIAL_SECONDS * 1000;
+}
+
+function computeSessionState(meta) {
+  const state = String(meta?.sessionState || "idle");
+  if (state === "trial") {
+    const endsAt = computeTrialEndsAt(meta);
+    if (endsAt && now() >= endsAt) return "ended";
+    return "trial";
+  }
+  if (state === "continued") return "continued";
+  if (state === "ended") return "ended";
+  return "idle";
 }
 
 /* IP state */
@@ -146,7 +136,6 @@ function allowIpEvent(ip) {
 
 /* Rooms in memory */
 
-// roomCode -> { strokes: [], clients:Set(ws), participants:[ws|null, ws|null] }
 const rooms = new Map();
 
 function getRoom(roomCode) {
@@ -154,18 +143,43 @@ function getRoom(roomCode) {
     rooms.set(roomCode, {
       strokes: [],
       clients: new Set(),
-      participants: [null, null],
+      participants: new Set(), // ws
+      spectators: new Set(), // ws
+      meta: { sessionState: "idle", trialStartedAt: 0, lastRoomState: "quiet", lastActiveAt: now() },
     });
   }
   return rooms.get(roomCode);
 }
 
-function otherParticipant(room, ws) {
-  if (!room) return null;
-  for (const p of room.participants) {
-    if (p && p !== ws) return p;
+function promoteSpectatorIfPossible(room) {
+  // Keep room strictly 2 participants.
+  // If a participant slot opens, automatically promote the oldest spectator.
+  while (room && room.participants.size < 2 && room.spectators.size > 0) {
+    const next = room.spectators.values().next().value;
+    if (!next) break;
+    room.spectators.delete(next);
+    room.participants.add(next);
+    next._role = "participant";
   }
-  return null;
+}
+
+function getCounts(room) {
+  return {
+    total: room.clients.size,
+    participants: room.participants.size,
+    spectators: room.spectators.size,
+  };
+}
+
+async function loadRoomMeta(roomCode) {
+  const meta = await redis.get(roomMetaKey(roomCode));
+  if (meta && typeof meta === "object") return meta;
+  return { sessionState: "idle", trialStartedAt: 0, lastRoomState: "quiet", lastActiveAt: now() };
+}
+
+async function saveRoomMeta(roomCode, meta) {
+  await redis.set(roomMetaKey(roomCode), meta, { ex: ROOM_TTL_SECONDS });
+  await touchRoom(roomCode);
 }
 
 function broadcast(roomCode, obj) {
@@ -174,71 +188,101 @@ function broadcast(roomCode, obj) {
   for (const client of room.clients) wsSend(client, obj);
 }
 
-function broadcastPeople(roomCode) {
+function broadcastStatus(roomCode) {
   const room = rooms.get(roomCode);
-  const count = room ? room.clients.size : 0;
-  const participants = room ? room.participants.filter(Boolean).length : 0;
-  broadcast(roomCode, { type: "status", roomCode, count, participants });
-}
+  if (!room) return;
 
-async function saveMeta(roomCode, room) {
-  const meta = {
-    roomCode,
-    updatedAt: now(),
-    // "active" means 2 participants present
-    status: room.participants.filter(Boolean).length === 2 ? "active" : "quiet",
-    participants: room.participants.filter(Boolean).length,
-    clients: room.clients.size,
-  };
-  await redis.set(roomMetaKey(roomCode), meta, { ex: ROOM_TTL_SECONDS });
-  await touchRoom(roomCode);
-}
+  const counts = getCounts(room);
+  const meta = room.meta || {};
+  const sessionState = computeSessionState(meta);
+  const trialEndsAt = sessionState === "trial" ? computeTrialEndsAt(meta) : 0;
 
-/* Static file server */
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function send(res, code, type, body) {
-  res.writeHead(code, {
-    "content-type": type,
-    "cache-control": "no-store",
-  });
-  res.end(body);
-}
-
-function serveFile(res, filePath, type) {
-  try {
-    const data = fs.readFileSync(filePath);
-    send(res, 200, type, data);
-  } catch {
-    send(res, 404, "text/plain; charset=utf-8", "not found");
+  for (const client of room.clients) {
+    const role = room.participants.has(client) ? "participant" : "spectator";
+    wsSend(client, {
+      type: "status",
+      roomCode,
+      count: counts.total,
+      participants: counts.participants,
+      spectators: counts.spectators,
+      role,
+      sessionState,
+      trialEndsAt,
+    });
   }
 }
+
+async function ensureTrialStarted(roomCode) {
+  const room = rooms.get(roomCode);
+  if (!room) return;
+  const meta = room.meta || {};
+  const state = computeSessionState(meta);
+
+  // Only start trial automatically when there are exactly 2 participants and session is idle
+  if (room.participants.size >= 2 && state === "idle") {
+    meta.sessionState = "trial";
+    meta.trialStartedAt = now();
+    meta.lastActiveAt = now();
+    meta.lastRoomState = "active";
+    room.meta = meta;
+    await saveRoomMeta(roomCode, meta);
+
+    broadcast(roomCode, {
+      type: "session",
+      roomCode,
+      sessionState: "trial",
+      trialEndsAt: computeTrialEndsAt(meta),
+    });
+  }
+}
+
+async function checkTrialExpiry(roomCode) {
+  const room = rooms.get(roomCode);
+  if (!room) return;
+  const meta = room.meta || {};
+  const state = computeSessionState(meta);
+  if (state !== "ended") return;
+
+  // Persist ended state once
+  if (meta.sessionState === "trial") {
+    meta.sessionState = "ended";
+    meta.lastActiveAt = now();
+    room.meta = meta;
+    await saveRoomMeta(roomCode, meta);
+    broadcast(roomCode, { type: "session", roomCode, sessionState: "ended" });
+  }
+}
+
+/* Matchmaking (simple MVP in memory) */
+
+const coachWaitQueues = new Map(); // key -> Set<ws>
+
+function matchKey(lang, goal) {
+  return `${String(lang || "EN").toUpperCase()}|${String(goal || "CONV").toUpperCase()}`;
+}
+
+function addCoachToQueue(ws, key) {
+  if (!coachWaitQueues.has(key)) coachWaitQueues.set(key, new Set());
+  coachWaitQueues.get(key).add(ws);
+  ws._matchKey = key;
+  ws._isCoachWaiting = true;
+}
+
+function removeCoachFromQueue(ws) {
+  const key = ws._matchKey;
+  if (!key) return;
+  const q = coachWaitQueues.get(key);
+  if (q) q.delete(ws);
+  ws._matchKey = "";
+  ws._isCoachWaiting = false;
+}
+
+/* Server */
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-  const pathname = url.pathname;
-
-  if (pathname === "/health") {
-    send(res, 200, "text/plain; charset=utf-8", "ok");
-    return;
-  }
-
-  if (pathname === "/" || pathname === "/index.html") {
-    serveFile(res, path.join(__dirname, "index.html"), "text/html; charset=utf-8");
-    return;
-  }
-
-  if (pathname === "/canvas.html") {
-    serveFile(res, path.join(__dirname, "canvas.html"), "text/html; charset=utf-8");
-    return;
-  }
-
-  send(res, 404, "text/plain; charset=utf-8", "not found");
+  res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+  res.end("ok");
 });
-
-/* WebSocket */
 
 const wss = new WebSocketServer({ server });
 
@@ -247,17 +291,16 @@ wss.on("connection", (ws, req) => {
   ws._ip = ip;
   ws._joined = false;
   ws._roomCode = "";
-  ws._role = "spectator"; // participant | spectator
-  ws._slot = -1; // 0 or 1 for participants
+  ws._role = ""; // participant | spectator
+  ws._matchKey = "";
+  ws._isCoachWaiting = false;
 
   const st = getIpState(ip);
   st.conns += 1;
 
   if (st.conns > MAX_CONN_PER_IP) {
     st.conns = Math.max(0, st.conns - 1);
-    try {
-      ws.close(1008, "too many connections");
-    } catch {}
+    try { ws.close(1008, "too many connections"); } catch {}
     return;
   }
 
@@ -265,16 +308,26 @@ wss.on("connection", (ws, req) => {
     const s = ipState.get(ws._ip);
     if (s) s.conns = Math.max(0, s.conns - 1);
 
+    removeCoachFromQueue(ws);
+
     if (ws._joined && ws._roomCode) {
       const room = rooms.get(ws._roomCode);
       if (room) {
         room.clients.delete(ws);
-        if (ws._role === "participant" && ws._slot >= 0) {
-          if (room.participants[ws._slot] === ws) room.participants[ws._slot] = null;
-        }
+        room.participants.delete(ws);
+        room.spectators.delete(ws);
 
-        broadcastPeople(ws._roomCode);
-        await saveMeta(ws._roomCode, room);
+        // If a participant slot opened, promote the oldest spectator automatically.
+        promoteSpectatorIfPossible(room);
+
+        // Update meta and persist lastRoomState
+        const meta = room.meta || (await loadRoomMeta(ws._roomCode));
+        meta.lastActiveAt = now();
+        meta.lastRoomState = room.participants.size >= 2 ? "active" : "quiet";
+        room.meta = meta;
+        await saveRoomMeta(ws._roomCode, meta);
+
+        broadcastStatus(ws._roomCode);
 
         if (room.clients.size === 0) {
           rooms.delete(ws._roomCode);
@@ -299,12 +352,55 @@ wss.on("connection", (ws, req) => {
     if (!msg || typeof msg !== "object") return;
 
     const type = String(msg.type || "");
-    const roomCode = normalizeRoom(msg.roomCode || ws._roomCode);
 
+    // Heartbeat
     if (type === "ping") {
       wsSend(ws, { type: "pong" });
       return;
     }
+
+    // Matchmaking messages live on index.html (no room join required)
+    if (type === "match_request") {
+      const role = String(msg.role || "");
+      const lang = String(msg.lang || "EN").toUpperCase();
+      const goal = String(msg.goal || "CONV").toUpperCase();
+      const key = matchKey(lang, goal);
+
+      if (role === "coach") {
+        removeCoachFromQueue(ws);
+        addCoachToQueue(ws, key);
+        wsSend(ws, { type: "waiting", role: "coach" });
+        return;
+      }
+
+      if (role === "student") {
+        const q = coachWaitQueues.get(key);
+        const coach = q ? Array.from(q).find(c => c.readyState === 1) : null;
+        if (!coach) {
+          wsSend(ws, { type: "waiting", role: "student" });
+          return;
+        }
+
+        // Consume coach
+        q.delete(coach);
+        coach._isCoachWaiting = false;
+
+        const roomCode = randomRoomCode();
+        const meta = { sessionState: "idle", trialStartedAt: 0, lastRoomState: "quiet", lastActiveAt: now() };
+        await saveRoomMeta(roomCode, meta);
+        await redis.set(roomKey(roomCode), [], { ex: ROOM_TTL_SECONDS });
+
+        wsSend(coach, { type: "matched", roomCode });
+        wsSend(ws, { type: "matched", roomCode });
+        return;
+      }
+
+      wsSend(ws, { type: "warn", reason: "invalid match role" });
+      return;
+    }
+
+    // Room based messages
+    const roomCode = normalizeRoom(msg.roomCode || ws._roomCode);
 
     if (!ROOM_CODE_RE.test(roomCode)) {
       wsSend(ws, { type: "warn", reason: "invalid room" });
@@ -321,44 +417,55 @@ wss.on("connection", (ws, req) => {
         return;
       }
 
-      // Assign role: first 2 are participants, rest spectators
-      let role = "spectator";
-      let slot = -1;
-      for (let i = 0; i < 2; i += 1) {
-        if (!room.participants[i]) {
-          room.participants[i] = ws;
-          role = "participant";
-          slot = i;
-          break;
-        }
-      }
-
       ws._joined = true;
       ws._roomCode = roomCode;
-      ws._role = role;
-      ws._slot = slot;
-      room.clients.add(ws);
 
-      // Load strokes from Redis only once per cold room
-      const saved = await redis.get(roomKey(roomCode));
-      if (room.strokes.length === 0 && Array.isArray(saved)) {
-        room.strokes = saved;
+      // Assign role: first two are participants, others spectators
+      if (room.participants.size < 2) {
+        ws._role = "participant";
+        room.participants.add(ws);
+      } else {
+        ws._role = "spectator";
+        room.spectators.add(ws);
       }
 
-      const meta = await redis.get(roomMetaKey(roomCode));
-      const status = meta && typeof meta === "object" && meta.status ? meta.status : "quiet";
+      room.clients.add(ws);
 
+      // Load persisted strokes and meta
+      const savedStrokes = await redis.get(roomKey(roomCode));
+      if (Array.isArray(savedStrokes)) room.strokes = savedStrokes;
+
+      room.meta = await loadRoomMeta(roomCode);
+
+      // Session state reconciliation
+      const sessionState = computeSessionState(room.meta);
+      const trialEndsAt = sessionState === "trial" ? computeTrialEndsAt(room.meta) : 0;
+
+      // Send init
       wsSend(ws, {
         type: "init",
         roomCode,
-        role,
-        slot,
-        status,
         strokes: room.strokes,
+        count: room.clients.size,
+        role: ws._role,
+        sessionState,
+        trialEndsAt,
       });
 
-      await saveMeta(roomCode, room);
-      broadcastPeople(roomCode);
+      await touchRoom(roomCode);
+
+      // Update meta lastRoomState
+      room.meta.lastActiveAt = now();
+      room.meta.lastRoomState = room.participants.size >= 2 ? "active" : "quiet";
+      await saveRoomMeta(roomCode, room.meta);
+
+      broadcastStatus(roomCode);
+
+      // Auto start trial if two participants are present and session is idle
+      await ensureTrialStarted(roomCode);
+
+      // If trial already expired, convert to ended and inform clients
+      await checkTrialExpiry(roomCode);
       return;
     }
 
@@ -374,87 +481,66 @@ wss.on("connection", (ws, req) => {
 
     const room = getRoom(roomCode);
 
-    // Drawing permissions
-    if (type === "stroke" || type === "clear") {
-      if (ws._role !== "participant") {
-        wsSend(ws, { type: "warn", reason: "spectators cannot draw" });
-        return;
-      }
-    }
+    // Keep session expiry updated on any message
+    await checkTrialExpiry(roomCode);
+
+    // Spectator restrictions
+    const isSpectator = room.spectators.has(ws);
 
     if (type === "stroke") {
+      if (isSpectator) return;
+
       const stroke = msg.stroke;
       if (!stroke || typeof stroke !== "object") return;
 
       room.strokes.push(stroke);
+
       if (room.strokes.length > MAX_ROOM_STROKES) {
         room.strokes.splice(0, room.strokes.length - MAX_ROOM_STROKES);
       }
 
       await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
-      await saveMeta(roomCode, room);
+      await touchRoom(roomCode);
+
+      room.meta.lastActiveAt = now();
+      room.meta.lastRoomState = room.participants.size >= 2 ? "active" : "quiet";
+      await saveRoomMeta(roomCode, room.meta);
 
       broadcast(roomCode, { type: "stroke", roomCode, stroke });
       return;
     }
 
     if (type === "clear") {
+      if (isSpectator) return;
+
       room.strokes = [];
       await redis.set(roomKey(roomCode), room.strokes, { ex: ROOM_TTL_SECONDS });
-      await saveMeta(roomCode, room);
+      await touchRoom(roomCode);
+
+      room.meta.lastActiveAt = now();
+      await saveRoomMeta(roomCode, room.meta);
 
       broadcast(roomCode, { type: "clear", roomCode });
       return;
     }
 
-    // Voice signaling (participants only)
-    const voiceTypes = new Set([
-      "voice_request",
-      "voice_accept",
-      "voice_reject",
-      "voice_offer",
-      "voice_answer",
-      "voice_candidate",
-      "voice_end",
-      "get_ice",
-    ]);
+    if (type === "continue") {
+      if (isSpectator) return;
 
-    if (voiceTypes.has(type)) {
-      if (ws._role !== "participant") {
-        wsSend(ws, { type: "warn", reason: "spectators cannot use voice" });
-        return;
-      }
+      const meta = room.meta || (await loadRoomMeta(roomCode));
+      meta.sessionState = "continued";
+      meta.lastActiveAt = now();
+      meta.lastRoomState = room.participants.size >= 2 ? "active" : "quiet";
+      room.meta = meta;
+      await saveRoomMeta(roomCode, meta);
 
-      if (type === "get_ice") {
-        wsSend(ws, { type: "ice", roomCode, iceServers: getIceServers() });
-        return;
-      }
-
-      const peer = otherParticipant(room, ws);
-      if (!peer) {
-        wsSend(ws, { type: "warn", reason: "no peer" });
-        return;
-      }
-
-      // Pass-through signaling payload (offer/answer/candidate)
-      if (type === "voice_offer" || type === "voice_answer" || type === "voice_candidate") {
-        wsSend(peer, {
-          type,
-          roomCode,
-          fromSlot: ws._slot,
-          payload: msg.payload || null,
-        });
-        return;
-      }
-
-      // Simple control messages
-      wsSend(peer, { type, roomCode, fromSlot: ws._slot });
+      broadcast(roomCode, { type: "session", roomCode, sessionState: "continued" });
+      broadcastStatus(roomCode);
       return;
     }
   });
 });
 
 server.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Unline server listening on :${PORT}`);
+  console.log(`WS server listening on port ${PORT}`);
 });
