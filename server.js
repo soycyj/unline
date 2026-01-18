@@ -12,9 +12,8 @@ app.use(express.json({ limit: "1mb" }));
 const PUBLIC_DIR = path.join(__dirname, "public");
 app.use(express.static(PUBLIC_DIR));
 
-// 루트 접속은 무조건 public/canvas.html로 보냄
 app.get("/", (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, "canvas.html"));
+  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
 });
 
 const PORT = process.env.PORT || 3000;
