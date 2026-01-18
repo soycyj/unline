@@ -67,6 +67,7 @@
     }
     .online{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
     .offline{color:#450a0a;background:rgba(239,68,68,0.16);border-color:rgba(239,68,68,0.35)}
+
     button{
       padding:9px 12px;
       border:1px solid var(--line);
@@ -82,6 +83,7 @@
     button.ghost{background:transparent}
     button.active{background:rgba(31,111,235,0.18);border-color:rgba(31,111,235,0.5)}
     button:disabled{opacity:0.55;cursor:not-allowed}
+
     input{
       padding:9px 12px;
       border-radius:12px;
@@ -103,6 +105,7 @@
       font-size:13px;
       outline:none;
     }
+
     .wrap{
       display:grid;
       grid-template-columns:260px 1fr 320px;
@@ -124,6 +127,7 @@
       touch-action:none;
       background:rgba(10,12,16,0.55);
     }
+
     .col{display:flex;flex-direction:column;gap:12px}
     .card{
       background:var(--panel);
@@ -141,6 +145,7 @@
     }
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .small{font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0 0}
+
     .swatches{display:flex;gap:8px;flex-wrap:wrap}
     .swatch{
       width:24px;height:24px;border-radius:8px;
@@ -152,6 +157,7 @@
       border-color:rgba(232,238,249,0.95);
       box-shadow:0 0 0 2px rgba(232,238,249,0.25) inset;
     }
+
     .banner{
       margin-top:10px;
       padding:10px 12px;
@@ -280,6 +286,7 @@
         <p class="small" id="voiceState">Idle</p>
         <audio id="remoteAudio" autoplay playsinline></audio>
         <p class="small" id="voiceHint"></p>
+        <p class="small" id="rtcDbg"></p>
       </div>
     </div>
   </div>
@@ -348,11 +355,9 @@
     function isStudent(){
       return (label || "").toLowerCase() === "student";
     }
-
     function canDraw(){
       return currentRole === "Participant" && sessionMode !== "trial_ended";
     }
-
     function canVoice(){
       return userProvidedClientId && currentRole === "Participant" && sessionMode !== "trial_ended";
     }
@@ -747,7 +752,18 @@
     let callActive = false;
     let isInitiator = false;
 
-    const rtcConfig = { iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }] };
+    function setRtcDbg(t){
+      const el = $("rtcDbg");
+      if(!el) return;
+      el.textContent = t || "";
+    }
+
+    // STUN only, 모바일에서 iceConnection failed가 자주 나오면 TURN 추가가 필요함
+    const rtcConfig = {
+      iceServers: [
+        { urls: ["stun:stun.l.google.com:19302"] }
+      ]
+    };
 
     function setVoiceState(t){
       $("voiceState").textContent = t;
@@ -756,17 +772,61 @@
 
     async function ensureLocalAudio(){
       if(localStream) return localStream;
-      localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
-      return localStream;
+      try{
+        localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+        return localStream;
+      }catch(e){
+        alert("마이크 권한이 필요합니다. 브라우저 설정에서 마이크를 허용해 주세요");
+        throw e;
+      }
+    }
+
+    let audioCtx = null;
+    let audioUnlocked = false;
+
+    async function unlockAudio(){
+      try{
+        const a = $("remoteAudio");
+        // iOS에서 srcObject 없어도 play 시도가 unlock에 도움 되는 경우가 있음
+        await a.play().catch(() => {});
+        if(!audioCtx){
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if(Ctx) audioCtx = new Ctx();
+        }
+        if(audioCtx && audioCtx.state === "suspended"){
+          await audioCtx.resume();
+        }
+        audioUnlocked = true;
+        setRtcDbg("audio unlocked");
+      }catch(e){
+        setRtcDbg("audio unlock failed");
+      }
     }
 
     async function createPeer(){
       pc = new RTCPeerConnection(rtcConfig);
 
       pc.onicecandidate = (e) => { if(e.candidate) send("voice_ice", { candidate: e.candidate }); };
-      pc.ontrack = (e) => {
+
+      pc.onicegatheringstatechange = () => setRtcDbg("iceGathering " + pc.iceGatheringState);
+      pc.oniceconnectionstatechange = () => setRtcDbg("iceConnection " + pc.iceConnectionState);
+      pc.onconnectionstatechange = () => setRtcDbg("connection " + pc.connectionState);
+      pc.onsignalingstatechange = () => setRtcDbg("signaling " + pc.signalingState);
+
+      pc.ontrack = async (e) => {
         const stream = e.streams && e.streams[0];
-        if(stream) $("remoteAudio").srcObject = stream;
+        if(stream){
+          const a = $("remoteAudio");
+          a.srcObject = stream;
+
+          // 원격 트랙이 들어오는 시점에 즉시 재생 시도
+          try{
+            await a.play();
+            setRtcDbg("remote audio playing");
+          }catch(err){
+            setRtcDbg("remote audio blocked, tap Enable audio");
+          }
+        }
       };
 
       const stream = await ensureLocalAudio();
@@ -774,20 +834,24 @@
     }
 
     $("enableAudioBtn").addEventListener("click", async () => {
-      try {
+      await unlockAudio();
+      try{
         const a = $("remoteAudio");
         await a.play();
-        alert("Audio enabled");
-      } catch (e) {
-        alert("Audio enable failed. Try again after starting voice.");
+        setRtcDbg("audio enabled");
+      }catch(e){
+        setRtcDbg("tap again after voice start");
       }
     });
 
     $("startVoiceBtn").addEventListener("click", async () => {
+      await unlockAudio();
+
       if(!userProvidedClientId){ alert("voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다"); return; }
       if(currentRole !== "Participant"){ alert("Participant만 음성을 시작할 수 있습니다"); return; }
       if(sessionMode === "trial_ended"){ alert("Trial이 종료되었습니다"); return; }
       if(callActive){ alert("이미 통화가 진행 중입니다"); return; }
+
       setVoiceState("Requesting");
       send("voice_request", {});
     });
@@ -882,12 +946,14 @@
 
       try{ $("remoteAudio").srcObject = null; }catch(e){}
       setVoiceState(stateText || "Idle");
+      setRtcDbg("");
     }
 
     setVoiceState("Idle");
     updateToolUi();
     updateVoiceUi();
 
+    // URL에 trialEndsAt이 있으면 WS 전에 바로 타이머 노출
     if(!sessionMode && trialEndsAtParam && Number.isFinite(trialEndsAtParam)) {
       if (trialEndsAtParam > Date.now()) {
         sessionMode = "trial";
