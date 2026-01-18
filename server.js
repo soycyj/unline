@@ -12,9 +12,9 @@ app.use(express.json({ limit: "1mb" }));
 const PUBLIC_DIR = __dirname;
 app.use(express.static(PUBLIC_DIR));
 
-// 정적 파일을 현재 디렉터리(루트)에서 바로 제공
-const PUBLIC_DIR = __dirname;
-app.use(express.static(PUBLIC_DIR));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "canvas.html"));
+});
 
 const PORT = process.env.PORT || 3000;
 
