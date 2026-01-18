@@ -179,6 +179,123 @@ app.get("/api/ice", (req, res) => {
   res.json({ ok: true, iceServers });
 });
 
+// =====================
+// Teacher Student matching, in memory MVP
+// =====================
+function genRoomCode() {
+  return Math.random().toString(16).slice(2, 8).toUpperCase();
+}
+function genClientId(prefix) {
+  return prefix + Math.random().toString(16).slice(2, 10);
+}
+
+/*
+waitingTeachers
+teacherId -> {
+  status: "waiting" | "matched",
+  roomCode,
+  teacherClientId,
+  matchedAt,
+  createdAt
+}
+*/
+const waitingTeachers = new Map();
+
+function buildTeacherUrl(roomCode, teacherClientId) {
+  return `/canvas.html?room=${encodeURIComponent(roomCode)}&clientId=${encodeURIComponent(
+    teacherClientId
+  )}&label=${encodeURIComponent("Teacher")}`;
+}
+
+function buildStudentUrl(roomCode, studentClientId) {
+  return `/canvas.html?room=${encodeURIComponent(roomCode)}&clientId=${encodeURIComponent(
+    studentClientId
+  )}&label=${encodeURIComponent("Student")}`;
+}
+
+// Teacher goes online, create a room and wait
+app.post("/api/teacher/online", (req, res) => {
+  const { teacherId } = req.body || {};
+  if (!teacherId) return res.status(400).json({ ok: false });
+
+  // If already exists, keep the same room
+  const existing = waitingTeachers.get(teacherId);
+  if (existing && (existing.status === "waiting" || existing.status === "matched")) {
+    return res.json({ ok: true, status: existing.status });
+  }
+
+  const roomCode = genRoomCode();
+  const teacherClientId = genClientId("t");
+
+  waitingTeachers.set(teacherId, {
+    status: "waiting",
+    roomCode,
+    teacherClientId,
+    matchedAt: null,
+    createdAt: nowMs(),
+  });
+
+  return res.json({ ok: true, status: "waiting" });
+});
+
+// Teacher polls for match result
+app.post("/api/teacher/poll", (req, res) => {
+  const { teacherId } = req.body || {};
+  if (!teacherId) return res.status(400).json({ ok: false });
+
+  const t = waitingTeachers.get(teacherId);
+  if (!t) return res.json({ ok: true, status: "offline" });
+
+  if (t.status === "matched") {
+    return res.json({
+      ok: true,
+      status: "matched",
+      teacherUrl: buildTeacherUrl(t.roomCode, t.teacherClientId),
+    });
+  }
+
+  return res.json({ ok: true, status: "waiting" });
+});
+
+// Teacher goes offline, remove from queue
+app.post("/api/teacher/offline", (req, res) => {
+  const { teacherId } = req.body || {};
+  if (!teacherId) return res.status(400).json({ ok: false });
+
+  waitingTeachers.delete(teacherId);
+  return res.json({ ok: true });
+});
+
+// Student requests match, pick the oldest waiting teacher
+app.post("/api/match", (req, res) => {
+  let pickedTeacherId = null;
+  let picked = null;
+
+  for (const [tid, t] of waitingTeachers.entries()) {
+    if (t.status !== "waiting") continue;
+    if (!picked || t.createdAt < picked.createdAt) {
+      picked = t;
+      pickedTeacherId = tid;
+    }
+  }
+
+  if (!picked || !pickedTeacherId) {
+    return res.json({ ok: false });
+  }
+
+  const studentClientId = genClientId("s");
+
+  picked.status = "matched";
+  picked.matchedAt = nowMs();
+  waitingTeachers.set(pickedTeacherId, picked);
+
+  return res.json({
+    ok: true,
+    studentUrl: buildStudentUrl(picked.roomCode, studentClientId),
+  });
+});
+
+
 app.post("/api/session/decision", (req, res) => {
   const { room, decision, clientId } = req.body || {};
   if (!room || !decision) return res.status(400).json({ ok: false });
