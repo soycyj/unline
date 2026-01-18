@@ -847,6 +847,16 @@
 
     $("startVoiceBtn").addEventListener("click", async () => {
       await unlockAudio();
+  const reasons = [];
+  if(!userProvidedClientId) reasons.push("missing clientId in URL");
+  if(currentRole !== "Participant") reasons.push("role is not Participant");
+  if(sessionMode === "trial_ended") reasons.push("trial already ended");
+  if(!ws || ws.readyState !== WebSocket.OPEN) reasons.push("ws not connected");
+
+  if(reasons.length){
+    alert("Cannot start voice: " + reasons.join(", "));
+    return;
+  }
 
       if(!userProvidedClientId){ alert("voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다"); return; }
       if(currentRole !== "Participant"){ alert("Participant만 음성을 시작할 수 있습니다"); return; }
