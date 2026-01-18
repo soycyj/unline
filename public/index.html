@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Unline</title>
+  <style>
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto;
+      background:#0b0d10;
+      color:#e8eef9;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:100vh;
+    }
+    .card{
+      width:min(760px, 92vw);
+      border:1px solid #273044;
+      border-radius:16px;
+      padding:18px;
+      background:rgba(20,24,33,0.9);
+    }
+    h1{margin:0 0 12px;font-size:20px}
+    p{margin:0 0 14px;color:#a9b4c7;font-size:13px;line-height:1.6}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:820px){ .grid{grid-template-columns:1fr} }
+    .box{
+      border:1px solid #273044;
+      border-radius:14px;
+      padding:14px;
+      background:rgba(10,12,16,0.35);
+    }
+    .box h2{margin:0 0 10px;font-size:14px}
+    input{
+      width:100%;
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid #273044;
+      background:rgba(10,12,16,0.6);
+      color:#e8eef9;
+      font-size:14px;
+      outline:none;
+      margin-top:10px;
+    }
+    .row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+    button{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #273044;
+      background:#2b3242;
+      color:#e8eef9;
+      cursor:pointer;
+      font-weight:900;
+      font-size:13px;
+    }
+    button.primary{background:#1f6feb;border-color:rgba(31,111,235,0.7)}
+    button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
+    button:disabled{opacity:0.55;cursor:not-allowed}
+    .small{margin-top:10px;color:#a9b4c7;font-size:12px;line-height:1.6}
+    .mono{
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New";
+      font-size:12px;
+      word-break:break-all;
+      background:rgba(10,12,16,0.6);
+      border:1px solid #273044;
+      padding:10px;
+      border-radius:12px;
+      margin-top:10px;
+      display:none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Unline</h1>
+    <p>기본 room 입장과 학생 선생 매칭. 참가자만 드로잉과 음성 가능.</p>
+
+    <div class="grid">
+      <div class="box">
+        <h2>Room 입장</h2>
+        <div class="small">Viewer로 입장 가능. 참가자는 clientId 포함 링크로 입장.</div>
+        <input id="room" placeholder="Room code" autocomplete="off" />
+        <div class="row">
+          <button id="joinViewer">Join as viewer</button>
+          <button class="primary" id="joinParticipant">Join as participant</button>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>학생 선생 매칭</h2>
+        <div class="small">선생은 온라인 대기 후 자동으로 매칭 룸으로 이동.</div>
+        <div class="row">
+          <button class="primary" id="teacherOnline">Teacher online</button>
+          <button class="danger" id="teacherOffline" disabled>Teacher offline</button>
+          <button id="studentMatch">Student match</button>
+        </div>
+        <div class="small" id="matchStatus">Idle</div>
+        <div class="mono" id="matchInfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const roomEl = document.getElementById("room");
+    const matchStatus = document.getElementById("matchStatus");
+    const matchInfo = document.getElementById("matchInfo");
+
+    function genId(prefix){
+      return prefix + Math.random().toString(16).slice(2,10);
+    }
+
+    function getRoom(){
+      return (roomEl.value || "").trim();
+    }
+
+    function go(url){
+      location.href = url;
+    }
+
+    async function postJson(url, body){
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+      return await res.json();
+    }
+
+    document.getElementById("joinViewer").addEventListener("click", () => {
+      const room = getRoom();
+      if(!room){ alert("room code를 입력해 주세요"); return; }
+      go(`/canvas.html?room=${encodeURIComponent(room)}`);
+    });
+
+    document.getElementById("joinParticipant").addEventListener("click", () => {
+      const room = getRoom();
+      if(!room){ alert("room code를 입력해 주세요"); return; }
+      const key = `unline_participant_clientId_${room}`;
+      const stored = localStorage.getItem(key);
+      const clientId = stored || genId("p");
+      localStorage.setItem(key, clientId);
+      go(`/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}&label=${encodeURIComponent("Participant")}`);
+    });
+
+    let teacherId = localStorage.getItem("unline_teacherId");
+    if(!teacherId){
+      teacherId = genId("teacher");
+      localStorage.setItem("unline_teacherId", teacherId);
+    }
+
+    const btnOnline = document.getElementById("teacherOnline");
+    const btnOffline = document.getElementById("teacherOffline");
+
+    let pollTimer = null;
+
+    async function pollTeacher(){
+      const out = await postJson("/api/teacher/poll", { teacherId });
+      if(!out.ok) return;
+
+      if(out.status === "waiting"){
+        matchStatus.textContent = "Teacher waiting";
+        return;
+      }
+
+      if(out.status === "matched" && out.teacherUrl){
+        matchStatus.textContent = "Matched moving to room";
+        go(out.teacherUrl);
+      }
+    }
+
+    btnOnline.addEventListener("click", async () => {
+      matchStatus.textContent = "Teacher going online";
+      matchInfo.style.display = "none";
+      matchInfo.textContent = "";
+
+      const out = await postJson("/api/teacher/online", { teacherId });
+      if(!out.ok){
+        matchStatus.textContent = "Teacher online failed";
+        return;
+      }
+
+      btnOnline.disabled = true;
+      btnOffline.disabled = false;
+
+      matchStatus.textContent = "Teacher waiting";
+      matchInfo.style.display = "block";
+      matchInfo.textContent = "Waiting for student match. Keep this tab open.";
+
+      if(pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(pollTeacher, 1500);
+    });
+
+    btnOffline.addEventListener("click", async () => {
+      matchStatus.textContent = "Teacher offline";
+      await postJson("/api/teacher/offline", { teacherId });
+
+      btnOnline.disabled = false;
+      btnOffline.disabled = true;
+
+      if(pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+
+      matchInfo.style.display = "none";
+      matchInfo.textContent = "";
+    });
+
+    document.getElementById("studentMatch").addEventListener("click", async () => {
+      matchStatus.textContent = "Student searching teacher";
+      matchInfo.style.display = "none";
+      matchInfo.textContent = "";
+
+      const out = await postJson("/api/match", {});
+      if(!out.ok){
+        matchStatus.textContent = "No teacher available";
+        alert("현재 대기 중인 선생이 없습니다");
+        return;
+      }
+
+      matchStatus.textContent = "Matched student moving to room";
+      go(out.studentUrl);
+    });
+  </script>
+</body>
+</html>
