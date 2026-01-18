@@ -1,5 +1,3 @@
-// server.js  CommonJS version, do not use type module
-
 const path = require("path");
 const http = require("http");
 const express = require("express");
@@ -7,7 +5,23 @@ const { WebSocketServer } = require("ws");
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+
+const PUBLIC_DIR = path.join(__dirname, "public");
+
+/* no cache for html so GitHub edits reflect immediately */
+app.use((req, res, next) => {
+  const p = req.path || "";
+  if (p === "/" || p.endsWith(".html")) {
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+  }
+  next();
+});
+
+app.use(express.static(PUBLIC_DIR));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "index.html"));
+});
 
 /* =========================
    Helpers
@@ -28,23 +42,10 @@ function safeJsonParse(s) {
     return null;
   }
 }
-function pickOldestWaitingTeacher() {
-  let pickedTeacherId = null;
-  let picked = null;
-  for (const [tid, t] of waitingTeachers.entries()) {
-    if (!t) continue;
-    if (t.status !== "waiting") continue;
-    if (!picked || t.createdAt < picked.createdAt) {
-      picked = t;
-      pickedTeacherId = tid;
-    }
-  }
-  return { pickedTeacherId, picked };
-}
 
 /* =========================
-   ICE servers, Metered TURN
-   Env keys on Render
+   Metered TURN for WebRTC
+   Render env keys
    METERED_TURN_URLS
    METERED_TURN_USERNAME
    METERED_TURN_CREDENTIAL
@@ -92,8 +93,7 @@ function buildStudentUrl(roomCode, studentClientId) {
 }
 
 app.post("/api/teacher/online", (req, res) => {
-  const body = req.body || {};
-  const teacherId = body.teacherId;
+  const teacherId = (req.body && req.body.teacherId) || "";
   if (!teacherId) return res.status(400).json({ ok: false });
 
   const existing = waitingTeachers.get(teacherId);
@@ -108,16 +108,15 @@ app.post("/api/teacher/online", (req, res) => {
     status: "waiting",
     roomCode,
     teacherClientId,
-    matchedAt: null,
     createdAt: nowMs(),
+    matchedAt: null,
   });
 
   return res.json({ ok: true, status: "waiting" });
 });
 
 app.post("/api/teacher/poll", (req, res) => {
-  const body = req.body || {};
-  const teacherId = body.teacherId;
+  const teacherId = (req.body && req.body.teacherId) || "";
   if (!teacherId) return res.status(400).json({ ok: false });
 
   const t = waitingTeachers.get(teacherId);
@@ -135,23 +134,27 @@ app.post("/api/teacher/poll", (req, res) => {
 });
 
 app.post("/api/teacher/offline", (req, res) => {
-  const body = req.body || {};
-  const teacherId = body.teacherId;
+  const teacherId = (req.body && req.body.teacherId) || "";
   if (!teacherId) return res.status(400).json({ ok: false });
-
   waitingTeachers.delete(teacherId);
   return res.json({ ok: true });
 });
 
 app.post("/api/match", (req, res) => {
-  const { pickedTeacherId, picked } = pickOldestWaitingTeacher();
+  let pickedTeacherId = null;
+  let picked = null;
 
-  if (!picked || !pickedTeacherId) {
-    return res.json({ ok: false });
+  for (const [tid, t] of waitingTeachers.entries()) {
+    if (!t || t.status !== "waiting") continue;
+    if (!picked || t.createdAt < picked.createdAt) {
+      picked = t;
+      pickedTeacherId = tid;
+    }
   }
 
-  const studentClientId = genClientId("s");
+  if (!picked || !pickedTeacherId) return res.json({ ok: false });
 
+  const studentClientId = genClientId("s");
   picked.status = "matched";
   picked.matchedAt = nowMs();
   waitingTeachers.set(pickedTeacherId, picked);
@@ -163,7 +166,7 @@ app.post("/api/match", (req, res) => {
 });
 
 /* =========================
-   Rooms and realtime state
+   Rooms realtime state
 ========================= */
 const rooms = new Map();
 
@@ -172,8 +175,8 @@ function getRoom(roomCode) {
   if (!r) {
     r = {
       room: roomCode,
-      users: new Map(), // clientId -> user
-      participants: new Set(), // clientId
+      users: new Map(),
+      participants: new Set(),
       strokes: [],
       sessionState: "waiting",
       trialEndsAt: null,
@@ -204,26 +207,13 @@ function broadcastRoomState(r) {
     ownerId: r.ownerId,
   };
   for (const u of r.users.values()) {
-    if (u.ws && u.ws.readyState === 1) {
-      u.ws.send(JSON.stringify(payload));
-    }
-  }
-}
-
-function broadcastToRoomExcept(r, exceptClientId, payload) {
-  for (const u of r.users.values()) {
-    if (u.clientId === exceptClientId) continue;
-    if (u.ws && u.ws.readyState === 1) {
-      u.ws.send(JSON.stringify(payload));
-    }
+    if (u.ws && u.ws.readyState === 1) u.ws.send(JSON.stringify(payload));
   }
 }
 
 function broadcastToRoomAll(r, payload) {
   for (const u of r.users.values()) {
-    if (u.ws && u.ws.readyState === 1) {
-      u.ws.send(JSON.stringify(payload));
-    }
+    if (u.ws && u.ws.readyState === 1) u.ws.send(JSON.stringify(payload));
   }
 }
 
@@ -231,7 +221,7 @@ function broadcastToRoomAll(r, payload) {
    HTTP server and WS server
 ========================= */
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, path: "/ws" });
 
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url, "http://localhost");
@@ -244,9 +234,10 @@ wss.on("connection", (ws, req) => {
 
   const r = getRoom(roomCode);
 
-  // Role assignment
-  // Teacher and Student get participant seats first, max 2
-  // If none are participant yet, first joiner becomes participant
+  /* Role assignment
+     teacher and student get participant seats first max 2
+     else if room empty first joiner becomes participant
+  */
   let role = "viewer";
   if ((kind === "teacher" || kind === "student") && r.participants.size < 2) {
     role = "participant";
@@ -261,32 +252,27 @@ wss.on("connection", (ws, req) => {
   const user = {
     ws,
     clientId,
-    label: labelRaw || "",
+    label: labelRaw,
     kind,
     role,
-    color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 60%)`,
+    color: `hsl(${Math.floor(Math.random() * 360)},70%,60%)`,
+    ready: false,
     joinedAt: nowMs(),
   };
 
   r.users.set(clientId, user);
 
-  // Send current canvas snapshot to the new client
   ws.send(JSON.stringify({ type: "canvas_snapshot", strokes: r.strokes }));
-
-  // Send room state to everyone
   broadcastRoomState(r);
 
   ws.on("message", (buf) => {
     const msg = safeJsonParse(buf.toString("utf8"));
     if (!msg || !msg.type) return;
 
-    // Keep user role aligned with participants set
-    // This matters if a participant reconnects
     const me = r.users.get(clientId);
     if (!me) return;
 
     if (msg.type === "hello") {
-      // Send state again on hello
       ws.send(JSON.stringify({ type: "canvas_snapshot", strokes: r.strokes }));
       broadcastRoomState(r);
       return;
@@ -316,6 +302,7 @@ wss.on("connection", (ws, req) => {
 
     if (msg.type === "set_role") {
       if (me.role !== "participant") return;
+
       const targetId = msg.targetClientId;
       const nextRole = msg.role === "participant" ? "participant" : "viewer";
       const target = r.users.get(targetId);
@@ -325,13 +312,11 @@ wss.on("connection", (ws, req) => {
         if (r.participants.size >= 2 && !r.participants.has(targetId)) return;
         r.participants.add(targetId);
         target.role = "participant";
+        if (!r.ownerId) r.ownerId = targetId;
       } else {
         r.participants.delete(targetId);
         target.role = "viewer";
-        if (r.ownerId === targetId) r.ownerId = null;
-        if (!r.ownerId && r.participants.size) {
-          r.ownerId = Array.from(r.participants)[0] || null;
-        }
+        if (r.ownerId === targetId) r.ownerId = Array.from(r.participants)[0] || null;
       }
 
       broadcastRoomState(r);
@@ -339,24 +324,18 @@ wss.on("connection", (ws, req) => {
     }
 
     if (msg.type === "ready_set") {
-      // Keep existing UI functionality without forcing voice to depend on it
-      // Minimal implementation, does not block voice even if trial ended
       const ready = !!msg.ready;
       me.ready = ready;
 
-      const participantCount = Array.from(r.users.values()).filter((u) => u.role === "participant").length;
-      const readyCount = Array.from(r.users.values()).filter((u) => u.role === "participant" && u.ready).length;
+      const participants = Array.from(r.users.values()).filter((u) => u.role === "participant");
+      const readyCount = participants.filter((u) => u.ready).length;
 
-      if (r.sessionState === "waiting") {
+      if (participants.length < 2) {
+        r.sessionState = readyCount ? "ready_partial" : "waiting";
+      } else {
         if (readyCount === 0) r.sessionState = "waiting";
-        else if (readyCount < Math.min(2, participantCount)) r.sessionState = "ready_partial";
+        else if (readyCount === 1) r.sessionState = "ready_partial";
         else {
-          r.sessionState = "trial_running";
-          r.trialEndsAt = nowMs() + 10 * 60 * 1000;
-        }
-      } else if (r.sessionState === "ready_partial") {
-        if (readyCount === 0) r.sessionState = "waiting";
-        else if (readyCount >= Math.min(2, participantCount)) {
           r.sessionState = "trial_running";
           r.trialEndsAt = nowMs() + 10 * 60 * 1000;
         }
@@ -370,8 +349,7 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
-    // Voice signaling
-    // Relay only between participants
+    /* Voice signaling relay between participants */
     if (
       msg.type === "voice_request" ||
       msg.type === "voice_accept" ||
@@ -388,9 +366,7 @@ wss.on("connection", (ws, req) => {
       for (const u of r.users.values()) {
         if (u.clientId === clientId) continue;
         if (u.role !== "participant") continue;
-        if (u.ws && u.ws.readyState === 1) {
-          u.ws.send(JSON.stringify(payload));
-        }
+        if (u.ws && u.ws.readyState === 1) u.ws.send(JSON.stringify(payload));
       }
       return;
     }
@@ -400,27 +376,17 @@ wss.on("connection", (ws, req) => {
     r.users.delete(clientId);
     r.participants.delete(clientId);
 
-    if (r.ownerId === clientId) r.ownerId = null;
-    if (!r.ownerId && r.participants.size) {
-      r.ownerId = Array.from(r.participants)[0] || null;
-    }
+    if (r.ownerId === clientId) r.ownerId = Array.from(r.participants)[0] || null;
 
-    // Cleanup waiting teacher record if desired, optional
-    // We do not force teacher offline here because teacherId is separate
-
-    // If room empty, keep it for now, or delete to save memory
     if (r.users.size === 0) {
-      // Keep strokes for a bit or remove immediately
-      // rooms.delete(roomCode);
-    } else {
-      broadcastRoomState(r);
+      rooms.delete(roomCode);
+      return;
     }
+
+    broadcastRoomState(r);
   });
 });
 
-/* =========================
-   Start
-========================= */
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log("unline server running on", PORT);
