@@ -76,6 +76,7 @@
     button.primary{background:var(--btn)}
     button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
     button:disabled{opacity:0.55;cursor:not-allowed}
+
     input{
       padding:10px 12px;
       border-radius:12px;
@@ -87,6 +88,19 @@
       outline:none;
       width:160px;
     }
+    input[type="color"]{
+      width:44px;
+      height:40px;
+      padding:0;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(10,12,16,0.55);
+    }
+    input[type="range"]{
+      width:140px;
+      accent-color: var(--btn);
+    }
+
     .wrap{
       flex:1;
       display:grid;
@@ -142,6 +156,7 @@
       .wrap{grid-template-columns:1fr}
       input{width:140px}
       .stage{min-height:420px}
+      input[type="range"]{width:120px}
     }
   </style>
 </head>
@@ -155,23 +170,23 @@
       <div class="pill">Session <strong id="sessionTxt">waiting</strong></div>
       <div id="trialPill" class="pill" style="display:none">Trial <strong id="trialCountdown">10:00</strong></div>
     </div>
-  <div class="right">
-  <button id="homeBtn">Home</button>
 
-  <button id="penBtn" class="primary">Pen</button>
-  <button id="eraserBtn">Eraser</button>
+    <div class="right">
+      <button id="homeBtn">Home</button>
 
-  <input id="colorInput" type="color" value="#e8eef9" title="Pen color" />
-  <div style="display:flex;align-items:center;gap:8px">
-    <input id="widthInput" type="range" min="1" max="18" value="3" />
-    <span id="widthTxt" class="pill" style="padding:6px 8px">3</span>
-  </div>
+      <button id="penBtn" class="primary">Pen</button>
+      <button id="eraserBtn">Eraser</button>
 
-  <input id="roomInput" placeholder="Room code" />
-  <button id="goRoomBtn">Go</button>
-  <button id="clearBtn" class="danger">Clear</button>
-</div>
+      <input id="colorInput" type="color" value="#e8eef9" title="Pen color" />
+      <div style="display:flex;align-items:center;gap:8px">
+        <input id="widthInput" type="range" min="1" max="18" value="3" />
+        <span id="widthTxt" class="pill" style="padding:6px 8px">3</span>
+      </div>
 
+      <input id="roomInput" placeholder="Room code" />
+      <button id="goRoomBtn">Go</button>
+      <button id="clearBtn" class="danger">Clear</button>
+    </div>
   </div>
 
   <div class="wrap">
@@ -228,6 +243,23 @@
       const key = "unline_clientId";
       clientId = localStorage.getItem(key) || ("c" + Math.random().toString(16).slice(2, 10));
       localStorage.setItem(key, clientId);
+    }
+
+    const toolKey = "unline_tool";
+    const colorKey = "unline_penColor";
+    const widthKey = "unline_penWidth";
+
+    let toolMode = localStorage.getItem(toolKey) || "pen";
+    let penColor = localStorage.getItem(colorKey) || "#e8eef9";
+    let penWidth = Number(localStorage.getItem(widthKey) || 3);
+
+    function syncToolUi(){
+      $("penBtn").classList.toggle("primary", toolMode === "pen");
+      $("eraserBtn").classList.toggle("primary", toolMode === "eraser");
+      $("colorInput").disabled = toolMode !== "pen";
+      $("widthInput").value = String(penWidth);
+      $("widthTxt").textContent = String(penWidth);
+      $("colorInput").value = penColor;
     }
 
     function setConn(online){
@@ -433,6 +465,35 @@
       });
     }
 
+    $("homeBtn").addEventListener("click", () => {
+      location.href = "/";
+    });
+
+    $("penBtn").addEventListener("click", () => {
+      toolMode = "pen";
+      localStorage.setItem(toolKey, toolMode);
+      syncToolUi();
+    });
+
+    $("eraserBtn").addEventListener("click", () => {
+      toolMode = "eraser";
+      localStorage.setItem(toolKey, toolMode);
+      syncToolUi();
+    });
+
+    $("colorInput").addEventListener("input", (e) => {
+      penColor = e.target.value || "#e8eef9";
+      localStorage.setItem(colorKey, penColor);
+      syncToolUi();
+    });
+
+    $("widthInput").addEventListener("input", (e) => {
+      const v = Math.max(1, Math.min(18, Number(e.target.value || 3)));
+      penWidth = v;
+      localStorage.setItem(widthKey, String(penWidth));
+      syncToolUi();
+    });
+
     $("goRoomBtn").addEventListener("click", () => {
       const nextRoom = ($("roomInput").value || "").trim();
       if (!nextRoom) return;
@@ -522,13 +583,12 @@
       if (!drawing) return;
       const p = posFromEvent(e);
 
-      const me = users.find(x => x.clientId === clientId);
       const stroke = {
         a: last,
         b: p,
-        mode: "pen",
-        color: me ? me.color : "#e8eef9",
-        w: 3
+        mode: toolMode,
+        color: penColor,
+        w: penWidth
       };
 
       drawStroke(stroke);
@@ -720,6 +780,7 @@
 
     async function boot() {
       await loadIceServers();
+      syncToolUi();
       connect();
       updateUi();
     }
