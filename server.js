@@ -1,339 +1,445 @@
-// server.js
-// Unline WebSocket server with room canvas sync, role gating, ready based trial start, ICE config endpoint
+"use strict";
 
-import express from "express";
-import http from "http";
-import { WebSocketServer } from "ws";
-import crypto from "crypto";
+const path = require("path");
+const express = require("express");
+const http = require("http");
+const { WebSocketServer } = require("ws");
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+
+const PUBLIC_DIR = path.join(__dirname, "public");
+app.use(express.static(PUBLIC_DIR));
 
 const PORT = process.env.PORT || 3000;
 
-function nowMs() { return Date.now(); }
-function id8() { return crypto.randomBytes(4).toString("hex"); }
-
-const PALETTE = [
-  "#E8EEF9","#22C55E","#3B82F6","#A855F7","#F59E0B","#EF4444","#14B8A6","#F472B6"
-];
-
-function pickColor(used) {
-  for (const c of PALETTE) if (!used.has(c)) return c;
-  return PALETTE[Math.floor(Math.random() * PALETTE.length)];
+function nowMs() {
+  return Date.now();
 }
 
-// Room state model
-// rooms.get(room) => {
-//   clients: Map(clientId, { ws, clientId, color, joinedAt, ready, role }),
-//   ownerId: string | null,
-//   participants: Set(clientId),
-//   strokes: Array(strokeMsg),
-//   sessionMode: "lobby" | "trial" | "trial_ended" | "learning",
-//   trialEndsAt: number | null,
-//   lastActiveAt: number
-// }
-const rooms = new Map();
-
-function getRoom(roomCode) {
-  if (!rooms.has(roomCode)) {
-    rooms.set(roomCode, {
-      clients: new Map(),
-      ownerId: null,
-      participants: new Set(),
-      strokes: [],
-      sessionMode: "lobby",
-      trialEndsAt: null,
-      lastActiveAt: nowMs(),
-    });
-  }
-  return rooms.get(roomCode);
-}
-
-function resetRoom(roomCode) {
-  rooms.delete(roomCode);
-}
-
-function safeSend(ws, obj) {
+function safeJsonParse(s, fallback) {
   try {
-    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
-  } catch {}
-}
-
-function broadcast(roomCode, obj) {
-  const r = rooms.get(roomCode);
-  if (!r) return;
-  for (const c of r.clients.values()) safeSend(c.ws, obj);
-}
-
-function buildRoster(r) {
-  return Array.from(r.clients.values()).map(c => ({
-    clientId: c.clientId,
-    shortId: c.clientId.slice(0, 6),
-    color: c.color,
-    role: c.role,
-    ready: !!c.ready,
-    isOwner: r.ownerId === c.clientId,
-  }));
-}
-
-function recomputeRoles(r) {
-  for (const c of r.clients.values()) {
-    c.role = r.participants.has(c.clientId) ? "Participant" : "Viewer";
+    return JSON.parse(s);
+  } catch {
+    return fallback;
   }
 }
 
-function roomStateFor(r, selfId) {
-  const self = r.clients.get(selfId);
-  const roster = buildRoster(r);
+function pickColor(seed) {
+  const colors = [
+    "#60a5fa",
+    "#f87171",
+    "#34d399",
+    "#a78bfa",
+    "#fbbf24",
+    "#fb7185",
+    "#22c55e",
+    "#38bdf8",
+  ];
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return colors[h % colors.length];
+}
+
+function buildRoom() {
   return {
-    type: "room_state",
-    visitors: r.clients.size,
-    sessionMode: r.sessionMode,
-    trialEndsAt: r.trialEndsAt,
-    self: {
-      clientId: selfId,
-      shortId: selfId.slice(0, 6),
-      color: self ? self.color : "#E8EEF9",
-      role: self ? self.role : "Viewer",
-      ready: self ? !!self.ready : false,
-      isOwner: r.ownerId === selfId,
+    users: new Map(), // clientId -> { ws, role, color, kind, joinedAt }
+    participants: new Set(), // clientId
+    ready: new Set(), // clientId
+    canvas: {
+      strokes: [],
+      updatedAt: nowMs(),
     },
-    roster
+    session: {
+      state: "waiting", // waiting | ready_partial | trial_running | trial_ended | learning
+      trialEndsAt: null,
+      startedAt: null,
+    },
+    ownerId: null, // first participant
   };
 }
 
-function maybeStartTrial(roomCode) {
-  const r = rooms.get(roomCode);
-  if (!r) return;
+const rooms = new Map(); // room -> roomObj
 
-  // Start only in lobby
-  if (r.sessionMode !== "lobby") return;
-
-  const participantIds = Array.from(r.participants);
-  if (participantIds.length !== 2) return;
-
-  const a = r.clients.get(participantIds[0]);
-  const b = r.clients.get(participantIds[1]);
-  if (!a || !b) return;
-
-  if (!a.ready || !b.ready) return;
-
-  r.sessionMode = "trial";
-  r.trialEndsAt = nowMs() + 10 * 60 * 1000;
-
-  broadcast(roomCode, {
-    type: "session_started",
-    sessionMode: r.sessionMode,
-    trialEndsAt: r.trialEndsAt
-  });
-
-  // Broadcast room_state so UI updates immediately
-  for (const c of r.clients.values()) {
-    safeSend(c.ws, roomStateFor(r, c.clientId));
-  }
-
-  // Auto end trial
-  setTimeout(() => {
-    const rr = rooms.get(roomCode);
-    if (!rr) return;
-    if (rr.sessionMode !== "trial") return;
-    if (!rr.trialEndsAt) return;
-    if (nowMs() < rr.trialEndsAt) return;
-
-    rr.sessionMode = "trial_ended";
-    rr.trialEndsAt = null;
-
-    broadcast(roomCode, { type: "session_ended", sessionMode: rr.sessionMode });
-
-    for (const c of rr.clients.values()) {
-      safeSend(c.ws, roomStateFor(rr, c.clientId));
-    }
-  }, 10 * 60 * 1000 + 500);
+function getRoom(roomCode) {
+  if (!rooms.has(roomCode)) rooms.set(roomCode, buildRoom());
+  return rooms.get(roomCode);
 }
 
-// Serve static (Render uses root)
-app.use(express.static("public"));
+function deleteRoomIfEmpty(roomCode) {
+  const r = rooms.get(roomCode);
+  if (!r) return;
+  if (r.users.size === 0) rooms.delete(roomCode);
+}
 
-// ICE servers endpoint
-// Environment variables (recommended for mobile reliability)
-// TURN_URL=turn:your.turn.host:3478
-// TURN_USERNAME=xxx
-// TURN_CREDENTIAL=yyy
-app.get("/api/ice", (req, res) => {
-  const iceServers = [{ urls: ["stun:stun.l.google.com:19302"] }];
-
-  const turnUrl = (process.env.TURN_URL || "").trim();
-  const turnUser = (process.env.TURN_USERNAME || "").trim();
-  const turnCred = (process.env.TURN_CREDENTIAL || "").trim();
-
-  if (turnUrl && turnUser && turnCred) {
-    iceServers.push({
-      urls: [turnUrl],
-      username: turnUser,
-      credential: turnCred,
+function roomUserList(r) {
+  const out = [];
+  for (const [cid, u] of r.users.entries()) {
+    out.push({
+      clientId: cid,
+      color: u.color,
+      role: u.role,
     });
   }
+  return out;
+}
 
-  res.json({ ok: true, iceServers, hasTurn: !!(turnUrl && turnUser && turnCred) });
+function broadcast(roomCode, msgObj) {
+  const r = rooms.get(roomCode);
+  if (!r) return;
+  const payload = JSON.stringify(msgObj);
+  for (const u of r.users.values()) {
+    try {
+      u.ws.send(payload);
+    } catch {}
+  }
+}
+
+function sendTo(roomCode, clientId, msgObj) {
+  const r = rooms.get(roomCode);
+  if (!r) return;
+  const u = r.users.get(clientId);
+  if (!u) return;
+  try {
+    u.ws.send(JSON.stringify(msgObj));
+  } catch {}
+}
+
+function recomputeSessionState(r) {
+  const readyCount = r.ready.size;
+  if (r.session.state === "trial_running") return;
+
+  if (r.session.state === "trial_ended") return;
+
+  if (readyCount >= 2) {
+    r.session.state = "trial_running";
+    r.session.startedAt = nowMs();
+    r.session.trialEndsAt = r.session.startedAt + 10 * 60 * 1000;
+    scheduleTrialEnd(r);
+    return;
+  }
+
+  if (readyCount === 1) {
+    r.session.state = "ready_partial";
+    r.session.trialEndsAt = null;
+    r.session.startedAt = null;
+    return;
+  }
+
+  r.session.state = "waiting";
+  r.session.trialEndsAt = null;
+  r.session.startedAt = null;
+}
+
+function scheduleTrialEnd(r) {
+  const endsAt = r.session.trialEndsAt;
+  if (!endsAt) return;
+
+  const delay = Math.max(0, endsAt - nowMs());
+  setTimeout(() => {
+    if (r.session.state !== "trial_running") return;
+    if (!r.session.trialEndsAt) return;
+    if (nowMs() + 50 < r.session.trialEndsAt) return;
+
+    r.session.state = "trial_ended";
+    broadcast(r._roomCode, {
+      type: "room_state",
+      visitors: r.users.size,
+      users: roomUserList(r),
+      sessionState: r.session.state,
+      trialEndsAt: r.session.trialEndsAt,
+    });
+  }, delay);
+}
+
+function attachRoomCode(r, roomCode) {
+  r._roomCode = roomCode;
+}
+
+/*
+  TURN ICE servers are provided from env as JSON
+
+  Example TURN_ICE_SERVERS value
+  [
+    {"urls":["stun:stun.relay.metered.ca:80"]},
+    {"urls":["turn:global.relay.metered.ca:80"],"username":"...","credential":"..."},
+    {"urls":["turn:global.relay.metered.ca:80?transport=tcp"],"username":"...","credential":"..."},
+    {"urls":["turn:global.relay.metered.ca:443"],"username":"...","credential":"..."},
+    {"urls":["turns:global.relay.metered.ca:443?transport=tcp"],"username":"...","credential":"..."}
+  ]
+*/
+app.get("/api/ice", (req, res) => {
+  const raw = process.env.TURN_ICE_SERVERS || "[]";
+  const iceServers = safeJsonParse(raw, []);
+  res.json({ ok: true, iceServers });
+});
+
+app.post("/api/session/decision", (req, res) => {
+  const { room, decision, clientId } = req.body || {};
+  if (!room || !decision) return res.status(400).json({ ok: false });
+
+  const r = rooms.get(room);
+  if (!r) return res.json({ ok: false });
+
+  // decision은 kind=student 로 들어온 사람만 허용
+  // kind는 ws query label=Student 에서만 설정
+  const u = clientId ? r.users.get(clientId) : null;
+  if (!u || u.kind !== "student") return res.json({ ok: false });
+
+  if (decision === "continue") {
+    r.session.state = "learning";
+    broadcast(room, {
+      type: "room_state",
+      visitors: r.users.size,
+      users: roomUserList(r),
+      sessionState: r.session.state,
+      trialEndsAt: r.session.trialEndsAt,
+    });
+    return res.json({ ok: true });
+  }
+
+  if (decision === "retry" || decision === "end") {
+    // MVP에서는 단순히 trial_ended 유지
+    return res.json({ ok: true });
+  }
+
+  return res.json({ ok: false });
 });
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  if (!url.pathname.startsWith("/ws")) {
-    ws.close();
-    return;
+  const url = new URL(req.url, "http://localhost");
+  const roomCode = (url.searchParams.get("room") || "TEST").trim();
+  const clientId = (url.searchParams.get("clientId") || "").trim() || ("c" + Math.random().toString(16).slice(2, 10));
+  const label = (url.searchParams.get("label") || "").trim().toLowerCase();
+
+  const r = getRoom(roomCode);
+  attachRoomCode(r, roomCode);
+
+  const color = pickColor(clientId);
+
+  // role assign
+  let role = "viewer";
+  if (r.participants.size === 0) {
+    role = "participant";
+    r.participants.add(clientId);
+    r.ownerId = clientId;
   }
 
-  const room = (url.searchParams.get("room") || "TEST").trim();
-  const clientId = (url.searchParams.get("clientId") || "").trim() || ("c" + id8());
+  const kind = label === "student" ? "student" : label === "teacher" ? "teacher" : null;
 
-  const r = getRoom(room);
-
-  // Assign owner if first join
-  if (!r.ownerId) r.ownerId = clientId;
-
-  // Color assignment
-  const usedColors = new Set(Array.from(r.clients.values()).map(c => c.color));
-  const color = pickColor(usedColors);
-
-  r.clients.set(clientId, {
+  r.users.set(clientId, {
     ws,
-    clientId,
+    role,
     color,
+    kind,
     joinedAt: nowMs(),
-    ready: false,
-    role: "Viewer",
   });
 
-  // Default roles recompute
-  recomputeRoles(r);
+  // send initial state
+  sendTo(roomCode, clientId, {
+    type: "room_state",
+    visitors: r.users.size,
+    users: roomUserList(r),
+    role,
+    color,
+    sessionState: r.session.state,
+    trialEndsAt: r.session.trialEndsAt,
+    ownerId: r.ownerId,
+  });
 
-  // Send initial room_state and canvas sync to this client
-  safeSend(ws, roomStateFor(r, clientId));
-  safeSend(ws, { type: "sync_canvas", strokes: r.strokes });
+  // send canvas snapshot
+  sendTo(roomCode, clientId, {
+    type: "canvas_snapshot",
+    strokes: r.canvas.strokes,
+    updatedAt: r.canvas.updatedAt,
+  });
 
-  // Broadcast updated room_state to everyone
-  broadcast(room, { type: "roster_changed" });
-  for (const c of r.clients.values()) safeSend(c.ws, roomStateFor(r, c.clientId));
+  // broadcast join update
+  broadcast(roomCode, {
+    type: "room_state",
+    visitors: r.users.size,
+    users: roomUserList(r),
+    sessionState: r.session.state,
+    trialEndsAt: r.session.trialEndsAt,
+    ownerId: r.ownerId,
+  });
 
   ws.on("message", (buf) => {
     let msg;
-    try { msg = JSON.parse(buf.toString()); } catch { return; }
-    const type = msg.type || "";
-    r.lastActiveAt = nowMs();
+    try {
+      msg = JSON.parse(buf.toString("utf8"));
+    } catch {
+      return;
+    }
+    if (!msg || typeof msg.type !== "string") return;
 
-    // Always ensure room still exists
-    const rr = rooms.get(room);
-    if (!rr) return;
+    const me = r.users.get(clientId);
+    if (!me) return;
 
-    const self = rr.clients.get(clientId);
-    if (!self) return;
-
-    if (type === "hello") {
-      safeSend(ws, roomStateFor(rr, clientId));
-      safeSend(ws, { type: "sync_canvas", strokes: rr.strokes });
+    if (msg.type === "hello") {
+      sendTo(roomCode, clientId, {
+        type: "room_state",
+        visitors: r.users.size,
+        users: roomUserList(r),
+        role: me.role,
+        color: me.color,
+        sessionState: r.session.state,
+        trialEndsAt: r.session.trialEndsAt,
+        ownerId: r.ownerId,
+      });
       return;
     }
 
-    if (type === "set_ready") {
-      self.ready = !!msg.ready;
-      // Re broadcast state
-      for (const c of rr.clients.values()) safeSend(c.ws, roomStateFor(rr, c.clientId));
-      maybeStartTrial(room);
-      return;
-    }
+    if (msg.type === "set_role") {
+      if (me.role !== "participant") return;
+      const targetId = (msg.targetClientId || "").trim();
+      const nextRole = (msg.role || "").trim();
+      if (!targetId) return;
+      const target = r.users.get(targetId);
+      if (!target) return;
+      if (nextRole !== "participant" && nextRole !== "viewer") return;
 
-    if (type === "set_participant") {
-      // Only owner can grant
-      if (rr.ownerId !== clientId) return;
+      target.role = nextRole;
+      if (nextRole === "participant") r.participants.add(targetId);
+      else r.participants.delete(targetId);
 
-      const targetId = (msg.targetId || "").trim();
-      const allow = !!msg.allow;
-
-      if (!targetId || !rr.clients.has(targetId)) return;
-
-      if (allow) {
-        // Max 2 participants
-        if (rr.participants.size >= 2 && !rr.participants.has(targetId)) return;
-        rr.participants.add(targetId);
-      } else {
-        rr.participants.delete(targetId);
-        const t = rr.clients.get(targetId);
-        if (t) t.ready = false;
+      // 최소 한 명 participant 보장
+      if (r.participants.size === 0) {
+        target.role = "participant";
+        r.participants.add(targetId);
       }
 
-      // When participants change, reset ready gating
-      for (const cId of rr.clients.keys()) {
-        if (!rr.participants.has(cId)) rr.clients.get(cId).ready = false;
-      }
-
-      recomputeRoles(rr);
-      for (const c of rr.clients.values()) safeSend(c.ws, roomStateFor(rr, c.clientId));
+      broadcast(roomCode, {
+        type: "room_state",
+        visitors: r.users.size,
+        users: roomUserList(r),
+        sessionState: r.session.state,
+        trialEndsAt: r.session.trialEndsAt,
+        ownerId: r.ownerId,
+      });
       return;
     }
 
-    if (type === "clear") {
-      if (self.role !== "Participant") return;
-      rr.strokes = [];
-      broadcast(room, { type: "clear" });
+    if (msg.type === "ready_set") {
+      const v = !!msg.ready;
+      if (v) r.ready.add(clientId);
+      else r.ready.delete(clientId);
+
+      recomputeSessionState(r);
+
+      broadcast(roomCode, {
+        type: "room_state",
+        visitors: r.users.size,
+        users: roomUserList(r),
+        sessionState: r.session.state,
+        trialEndsAt: r.session.trialEndsAt,
+        ownerId: r.ownerId,
+        readyCount: r.ready.size,
+      });
       return;
     }
 
-    if (type === "draw") {
-      if (self.role !== "Participant") return;
+    if (msg.type === "draw") {
+      if (me.role !== "participant") return;
+      if (!msg.a || !msg.b) return;
+
       const stroke = {
-        type: "draw",
         a: msg.a,
         b: msg.b,
-        mode: msg.mode,
-        color: msg.color,
-        w: msg.w,
-        from: clientId,
+        mode: msg.mode || "pen",
+        color: msg.color || me.color,
+        w: Number(msg.w || 3),
       };
-      rr.strokes.push(stroke);
-      broadcast(room, stroke);
+
+      r.canvas.strokes.push(stroke);
+      if (r.canvas.strokes.length > 20000) r.canvas.strokes.splice(0, 2000);
+      r.canvas.updatedAt = nowMs();
+
+      broadcast(roomCode, { type: "draw", ...stroke });
       return;
     }
 
-    // Voice signaling allowed only for Participant with clientId set
-    const voiceTypes = new Set(["voice_request","voice_accept","voice_reject","voice_offer","voice_answer","voice_ice","voice_stop"]);
-    if (voiceTypes.has(type)) {
-      if (self.role !== "Participant") return;
-      broadcast(room, { ...msg, from: clientId });
+    if (msg.type === "clear") {
+      if (me.role !== "participant") return;
+      r.canvas.strokes = [];
+      r.canvas.updatedAt = nowMs();
+      broadcast(roomCode, { type: "clear" });
+      return;
+    }
+
+    // voice signaling relay, participant only
+    const voiceTypes = new Set([
+      "voice_request",
+      "voice_accept",
+      "voice_reject",
+      "voice_offer",
+      "voice_answer",
+      "voice_ice",
+      "voice_stop",
+    ]);
+
+    if (voiceTypes.has(msg.type)) {
+      if (me.role !== "participant") return;
+
+      // relay to other participants only
+      for (const [cid, u] of r.users.entries()) {
+        if (cid === clientId) continue;
+        if (u.role !== "participant") continue;
+        try {
+          u.ws.send(JSON.stringify({ ...msg, from: clientId }));
+        } catch {}
+      }
       return;
     }
   });
 
   ws.on("close", () => {
-    const rr = rooms.get(room);
-    if (!rr) return;
+    const u = r.users.get(clientId);
+    if (u) {
+      r.users.delete(clientId);
+      r.participants.delete(clientId);
+      r.ready.delete(clientId);
 
-    rr.clients.delete(clientId);
-    rr.participants.delete(clientId);
+      // owner가 나가면 남은 사람 중 첫 participant를 owner로
+      if (r.ownerId === clientId) {
+        const first = [...r.participants][0] || null;
+        r.ownerId = first;
+      }
 
-    // If owner left, assign new owner to earliest joiner
-    if (rr.ownerId === clientId) {
-      const next = Array.from(rr.clients.values()).sort((a,b) => a.joinedAt - b.joinedAt)[0];
-      rr.ownerId = next ? next.clientId : null;
+      // participants 없으면 첫 사용자에게 participant 부여
+      if (r.participants.size === 0) {
+        const firstUser = [...r.users.keys()][0];
+        if (firstUser) {
+          const uu = r.users.get(firstUser);
+          uu.role = "participant";
+          r.participants.add(firstUser);
+          if (!r.ownerId) r.ownerId = firstUser;
+        }
+      }
+
+      // trial 중 ready 상태 재정리
+      recomputeSessionState(r);
+
+      broadcast(roomCode, {
+        type: "room_state",
+        visitors: r.users.size,
+        users: roomUserList(r),
+        sessionState: r.session.state,
+        trialEndsAt: r.session.trialEndsAt,
+        ownerId: r.ownerId,
+      });
     }
 
-    // If room empty, reset room entirely
-    if (rr.clients.size === 0) {
-      resetRoom(room);
-      return;
+    // 마지막 사람이 나가면 room 삭제, 다음 입장 시 초기화
+    if (r.users.size === 0) {
+      rooms.delete(roomCode);
     }
-
-    // Recompute roles and rebroadcast
-    recomputeRoles(rr);
-    broadcast(room, { type: "roster_changed" });
-    for (const c of rr.clients.values()) safeSend(c.ws, roomStateFor(rr, c.clientId));
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`Server listening on ${PORT}`);
+  console.log("server listening on", PORT);
 });
