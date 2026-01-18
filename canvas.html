@@ -484,7 +484,8 @@
       }else{
         $("voiceHint").textContent = "";
       }
-      $("startVoiceBtn").disabled = !canVoice() || callActive;
+        // 진단을 위해 start 버튼은 항상 클릭 가능하게 둔다
+        $("startVoiceBtn").disabled = callActive;
       $("stopVoiceBtn").disabled = !callActive;
     }
 
