@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Unline Canvas</title>
   <style>
     :root{
@@ -26,8 +26,9 @@
       font-family:system-ui,-apple-system,Segoe UI,Roboto;
       display:flex;
       flex-direction:column;
-      height:100%;
+      min-height:100%;
     }
+
     .topbar{
       display:flex;
       gap:10px;
@@ -37,6 +38,9 @@
       border-bottom:1px solid var(--line);
       background:rgba(10,12,16,0.6);
       backdrop-filter: blur(6px);
+      position:sticky;
+      top:0;
+      z-index:20;
     }
     .left, .right{
       display:flex;
@@ -77,6 +81,7 @@
       background:var(--btn2);
       font-weight:900;
       font-size:13px;
+      -webkit-tap-highlight-color: transparent;
     }
     button.primary{background:var(--btn);border-color:rgba(31,111,235,0.7)}
     button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
@@ -106,19 +111,24 @@
       outline:none;
     }
 
+    /* 핵심: 고정 높이 제거 + 스크롤 허용 (모바일 클릭/겹침 문제 제거) */
     .wrap{
+      flex:1;
       display:grid;
       grid-template-columns:260px 1fr 320px;
       gap:12px;
       padding:12px;
-      height:calc(100% - 56px);
+      overflow:auto;
+      -webkit-overflow-scrolling: touch;
     }
+
     .stage{
       background:var(--panel);
       border:1px solid var(--line);
       border-radius:16px;
       overflow:hidden;
       position:relative;
+      min-height:320px;
     }
     canvas{
       width:100%;
@@ -207,11 +217,11 @@
     @media (max-width:1060px){
       .wrap{grid-template-columns:1fr}
       input{width:140px}
+      .stage{min-height:420px}
     }
     @media (max-width:520px){
       button{ padding:12px 14px; border-radius:14px; }
       input, select{ padding:12px 14px; border-radius:14px; }
-      .topbar{ position:sticky; top:0; z-index:20; }
       .wrap{ padding:10px; }
     }
   </style>
@@ -287,6 +297,11 @@
         <audio id="remoteAudio" autoplay playsinline></audio>
         <p class="small" id="voiceHint"></p>
         <p class="small" id="rtcDbg"></p>
+
+        <div class="row" style="margin-top:10px">
+          <button id="copyVoiceLinkBtn" class="ghost">Copy voice link</button>
+        </div>
+        <p class="small" id="linkHint"></p>
       </div>
     </div>
   </div>
@@ -474,18 +489,28 @@
       updateToolUi();
     }
 
+    function setRtcDbg(t){
+      const el = $("rtcDbg");
+      if(el) el.textContent = t || "";
+    }
+
     function updateVoiceUi(){
       if(!userProvidedClientId){
         $("voiceHint").textContent = "voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다";
+        $("linkHint").textContent = "room만으로 들어온 경우 Copy voice link로 링크를 만들어 상대에게 공유하세요";
       }else if(currentRole !== "Participant"){
         $("voiceHint").textContent = "현재 role이 Participant가 아닙니다";
+        $("linkHint").textContent = "";
       }else if(sessionMode === "trial_ended"){
         $("voiceHint").textContent = "Trial이 종료되었습니다";
+        $("linkHint").textContent = "";
       }else{
         $("voiceHint").textContent = "";
+        $("linkHint").textContent = "";
       }
-        // 진단을 위해 start 버튼은 항상 클릭 가능하게 둔다
-        $("startVoiceBtn").disabled = callActive;
+
+      // 진단/UX: Start는 클릭 가능하게 두고, 클릭 시점에 원인 안내
+      $("startVoiceBtn").disabled = callActive;
       $("stopVoiceBtn").disabled = !callActive;
     }
 
@@ -603,6 +628,7 @@
       location.href = "/";
     });
 
+    // ===== Drawing =====
     const swatchColors = ["#E8EEF9","#22C55E","#3B82F6","#A855F7","#F59E0B","#EF4444","#14B8A6","#F472B6"];
     let tool = "pen";
     let penColor = swatchColors[0];
@@ -748,18 +774,12 @@
       clearCanvas(true);
     });
 
+    // ===== Voice =====
     let pc = null;
     let localStream = null;
     let callActive = false;
     let isInitiator = false;
 
-    function setRtcDbg(t){
-      const el = $("rtcDbg");
-      if(!el) return;
-      el.textContent = t || "";
-    }
-
-    // STUN only, 모바일에서 iceConnection failed가 자주 나오면 TURN 추가가 필요함
     const rtcConfig = {
       iceServers: [
         { urls: ["stun:stun.l.google.com:19302"] }
@@ -773,35 +793,24 @@
 
     async function ensureLocalAudio(){
       if(localStream) return localStream;
-      try{
-        localStream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
-        return localStream;
-      }catch(e){
-        alert("마이크 권한이 필요합니다. 브라우저 설정에서 마이크를 허용해 주세요");
-        throw e;
-      }
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true },
+        video: false
+      });
+      return localStream;
     }
 
     let audioCtx = null;
-    let audioUnlocked = false;
 
     async function unlockAudio(){
-      try{
-        const a = $("remoteAudio");
-        // iOS에서 srcObject 없어도 play 시도가 unlock에 도움 되는 경우가 있음
-        await a.play().catch(() => {});
-        if(!audioCtx){
-          const Ctx = window.AudioContext || window.webkitAudioContext;
-          if(Ctx) audioCtx = new Ctx();
-        }
-        if(audioCtx && audioCtx.state === "suspended"){
-          await audioCtx.resume();
-        }
-        audioUnlocked = true;
-        setRtcDbg("audio unlocked");
-      }catch(e){
-        setRtcDbg("audio unlock failed");
+      const a = $("remoteAudio");
+      try{ await a.play(); }catch(e){}
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if(Ctx && !audioCtx) audioCtx = new Ctx();
+      if(audioCtx && audioCtx.state === "suspended"){
+        try{ await audioCtx.resume(); }catch(e){}
       }
+      setRtcDbg("audio unlocked");
     }
 
     async function createPeer(){
@@ -819,8 +828,6 @@
         if(stream){
           const a = $("remoteAudio");
           a.srcObject = stream;
-
-          // 원격 트랙이 들어오는 시점에 즉시 재생 시도
           try{
             await a.play();
             setRtcDbg("remote audio playing");
@@ -830,40 +837,52 @@
         }
       };
 
+      // localStream은 Start voice 클릭 시점에 미리 확보해둔다
       const stream = await ensureLocalAudio();
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
     }
 
     $("enableAudioBtn").addEventListener("click", async () => {
       await unlockAudio();
-      try{
-        const a = $("remoteAudio");
-        await a.play();
-        setRtcDbg("audio enabled");
-      }catch(e){
-        setRtcDbg("tap again after voice start");
-      }
+      const a = $("remoteAudio");
+      try{ await a.play(); setRtcDbg("audio enabled"); }catch(e){ setRtcDbg("tap again after voice start"); }
     });
 
     $("startVoiceBtn").addEventListener("click", async () => {
+      // 버튼 클릭 자체가 먹는지부터 확인 가능하도록 즉시 표시
+      setRtcDbg("start tapped");
+
       await unlockAudio();
-  const reasons = [];
-  if(!userProvidedClientId) reasons.push("missing clientId in URL");
-  if(currentRole !== "Participant") reasons.push("role is not Participant");
-  if(sessionMode === "trial_ended") reasons.push("trial already ended");
-  if(!ws || ws.readyState !== WebSocket.OPEN) reasons.push("ws not connected");
 
-  if(reasons.length){
-    alert("Cannot start voice: " + reasons.join(", "));
-    return;
-  }
+      const reasons = [];
+      if(!userProvidedClientId) reasons.push("missing clientId in URL");
+      if(currentRole !== "Participant") reasons.push("role is not Participant");
+      if(sessionMode === "trial_ended") reasons.push("trial already ended");
+      if(!ws || ws.readyState !== WebSocket.OPEN) reasons.push("ws not connected");
 
-      if(!userProvidedClientId){ alert("voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다"); return; }
-      if(currentRole !== "Participant"){ alert("Participant만 음성을 시작할 수 있습니다"); return; }
-      if(sessionMode === "trial_ended"){ alert("Trial이 종료되었습니다"); return; }
-      if(callActive){ alert("이미 통화가 진행 중입니다"); return; }
+      if(reasons.length){
+        setRtcDbg("blocked: " + reasons.join(", "));
+        alert("Cannot start voice: " + reasons.join(", "));
+        return;
+      }
+
+      if(callActive){
+        setRtcDbg("already in call");
+        return;
+      }
+
+      // 모바일 핵심: 클릭 제스처 타이밍에 마이크 권한을 먼저 확보
+      try{
+        setRtcDbg("requesting mic permission");
+        await ensureLocalAudio();
+      }catch(e){
+        setRtcDbg("mic permission denied");
+        alert("마이크 권한이 필요합니다. 브라우저 설정에서 마이크를 허용해 주세요");
+        return;
+      }
 
       setVoiceState("Requesting");
+      setRtcDbg("sending voice_request");
       send("voice_request", {});
     });
 
@@ -959,6 +978,27 @@
       setVoiceState(stateText || "Idle");
       setRtcDbg("");
     }
+
+    // Voice link 생성
+    function buildVoiceLink(){
+      const u = new URL(location.href);
+      u.searchParams.set("room", room);
+      u.searchParams.set("clientId", clientId);
+      if(label) u.searchParams.set("label", label);
+      if(sessionIdParam) u.searchParams.set("sessionId", sessionIdParam);
+      if(trialEndsAtParamRaw) u.searchParams.set("trialEndsAt", trialEndsAtParamRaw);
+      return u.toString();
+    }
+
+    $("copyVoiceLinkBtn").addEventListener("click", async () => {
+      const link = buildVoiceLink();
+      try{
+        await navigator.clipboard.writeText(link);
+        $("linkHint").textContent = "Copied. 이 링크로 입장한 사람만 음성이 허용됩니다";
+      }catch(e){
+        $("linkHint").textContent = link;
+      }
+    });
 
     setVoiceState("Idle");
     updateToolUi();
