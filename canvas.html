@@ -52,6 +52,9 @@
       font-size:12px;
       color:var(--muted);
       white-space:nowrap;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
     }
     .pill strong{color:var(--text);font-weight:900}
     .status{
@@ -64,8 +67,6 @@
     }
     .online{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
     .offline{color:#450a0a;background:rgba(239,68,68,0.16);border-color:rgba(239,68,68,0.35)}
-    .trial{color:#1f2937;background:rgba(245,158,11,0.22);border-color:rgba(245,158,11,0.45)}
-    .learning{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
     button{
       padding:9px 12px;
       border:1px solid var(--line);
@@ -163,7 +164,6 @@
       display:none;
     }
 
-    /* Trial decision modal */
     .modalWrap{
       position:fixed;
       inset:0;
@@ -197,15 +197,16 @@
       gap:10px;
       flex-wrap:wrap;
     }
+
     @media (max-width:1060px){
-      @media (max-width:520px){
-  button{ padding:12px 14px; border-radius:14px; }
-  input, select{ padding:12px 14px; border-radius:14px; }
-  .topbar{ position:sticky; top:0; z-index:20; }
-  .wrap{ padding:10px; }
-}
       .wrap{grid-template-columns:1fr}
       input{width:140px}
+    }
+    @media (max-width:520px){
+      button{ padding:12px 14px; border-radius:14px; }
+      input, select{ padding:12px 14px; border-radius:14px; }
+      .topbar{ position:sticky; top:0; z-index:20; }
+      .wrap{ padding:10px; }
     }
   </style>
 </head>
@@ -323,7 +324,6 @@
     const trialEndsAtParamRaw = (qs.get("trialEndsAt") || "").trim();
     const trialEndsAtParam = trialEndsAtParamRaw ? Number(trialEndsAtParamRaw) : null;
 
-
     const userProvidedClientId = !!(qs.get("clientId") || "").trim();
     let clientId = (qs.get("clientId") || "").trim();
     if(!clientId){
@@ -338,9 +338,8 @@
     let currentRole = "Unknown";
     let currentVisitors = 0;
 
-    // session state from server
-    let sessionMode = null; // trial | learning | null
-    let trialEndsAt = null; // epoch ms
+    let sessionMode = null;
+    let trialEndsAt = null;
     let sessionId = null;
 
     let trialTick = null;
@@ -360,22 +359,22 @@
 
     function applySessionUi(){
       const sessionTxt = $("sessionTxt");
-      const sessionPill = $("sessionPill");
       const trialPill = $("trialPill");
 
       if(sessionMode === "trial"){
         sessionTxt.textContent = "Trial";
-        sessionPill.className = "pill";
         $("trialBanner").style.display = "block";
         trialPill.style.display = "inline-flex";
       } else if(sessionMode === "learning"){
         sessionTxt.textContent = "Learning";
-        sessionPill.className = "pill";
+        $("trialBanner").style.display = "none";
+        trialPill.style.display = "none";
+      } else if(sessionMode === "trial_ended"){
+        sessionTxt.textContent = "Ended";
         $("trialBanner").style.display = "none";
         trialPill.style.display = "none";
       } else {
         sessionTxt.textContent = "None";
-        sessionPill.className = "pill";
         $("trialBanner").style.display = "none";
         trialPill.style.display = "none";
       }
@@ -404,7 +403,6 @@
         $("btnEnd").disabled = false;
       }
 
-      // stop voice in UI
       if(callActive){
         send("voice_stop", {});
         teardownVoice("Trial ended");
@@ -438,14 +436,20 @@
       if(payload && payload.role) currentRole = payload.role;
       if(payload && typeof payload.visitors === "number") currentVisitors = payload.visitors;
 
-      // session fields
-      sessionMode = payload.sessionMode || sessionMode || null;
-      trialEndsAt = payload.trialEndsAt || trialEndsAtParam || trialEndsAt || null;
-      sessionId = payload.sessionId || sessionIdParam || null;
+      const nextSessionMode = (payload && ("sessionMode" in payload)) ? payload.sessionMode : undefined;
+      const nextTrialEndsAt = (payload && ("trialEndsAt" in payload)) ? payload.trialEndsAt : undefined;
+      const nextSessionId = (payload && ("sessionId" in payload)) ? payload.sessionId : undefined;
+
+      sessionMode = (nextSessionMode ?? sessionMode ?? null);
+      trialEndsAt = (nextTrialEndsAt ?? trialEndsAtParam ?? trialEndsAt ?? null);
+      sessionId = (nextSessionId ?? sessionIdParam ?? sessionId ?? null);
+
+      if(!sessionMode && trialEndsAt && trialEndsAt > Date.now()){
+        sessionMode = "trial";
+      }
 
       $("roleTxt").textContent = currentRole;
       $("visitorsTxt").textContent = String(currentVisitors);
-
       $("viewerBanner").style.display = (currentRole !== "Participant") ? "block" : "none";
 
       applySessionUi();
@@ -455,8 +459,10 @@
       } else {
         if(trialTick) clearInterval(trialTick);
         trialTick = null;
-        $("decisionModal").style.display = "none";
-        trialEndedUiShown = false;
+
+        if(!trialEndedUiShown){
+          $("decisionModal").style.display = "none";
+        }
       }
 
       updateVoiceUi();
@@ -558,7 +564,6 @@
 
     $("backBtn").addEventListener("click", () => { location.href = "/"; });
 
-    // Decision modal actions
     async function postDecision(decision){
       const payload = { room, sessionId: sessionId || sessionIdParam, decision };
       const res = await fetch("/api/session/decision", {
@@ -571,9 +576,13 @@
 
     $("btnContinue").addEventListener("click", async () => {
       const out = await postDecision("continue");
-      if(out.ok){
+      if(out && out.ok){
         $("decisionModal").style.display = "none";
         trialEndedUiShown = false;
+        sessionMode = "learning";
+        applySessionUi();
+        updateVoiceUi();
+        updateToolUi();
         send("hello", {});
       }
     });
@@ -588,7 +597,6 @@
       location.href = "/";
     });
 
-    // tools
     const swatchColors = ["#E8EEF9","#22C55E","#3B82F6","#A855F7","#F59E0B","#EF4444","#14B8A6","#F472B6"];
     let tool = "pen";
     let penColor = swatchColors[0];
@@ -646,7 +654,6 @@
 
     renderSwatches();
 
-    // drawing
     const canvas = $("board");
     const ctx = canvas.getContext("2d");
     let drawing = false;
@@ -735,7 +742,6 @@
       clearCanvas(true);
     });
 
-    // voice
     let pc = null;
     let localStream = null;
     let callActive = false;
@@ -766,15 +772,16 @@
       const stream = await ensureLocalAudio();
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
     }
-      $("enableAudioBtn").addEventListener("click", async () => {
-  try {
-    const a = $("remoteAudio");
-    await a.play();
-    alert("Audio enabled");
-  } catch (e) {
-    alert("Audio enable failed. Try again after starting voice.");
-  }
-});
+
+    $("enableAudioBtn").addEventListener("click", async () => {
+      try {
+        const a = $("remoteAudio");
+        await a.play();
+        alert("Audio enabled");
+      } catch (e) {
+        alert("Audio enable failed. Try again after starting voice.");
+      }
+    });
 
     $("startVoiceBtn").addEventListener("click", async () => {
       if(!userProvidedClientId){ alert("voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다"); return; }
@@ -880,17 +887,17 @@
     setVoiceState("Idle");
     updateToolUi();
     updateVoiceUi();
-    // fallback: URL에 trialEndsAt이 있으면 WS가 늦어도 타이머는 즉시 노출
-if (!sessionMode && trialEndsAtParam && Number.isFinite(trialEndsAtParam)) {
-  if (trialEndsAtParam > Date.now()) {
-    sessionMode = "trial";
-    trialEndsAt = trialEndsAtParam;
-    applySessionUi();
-    startTrialCountdown();
-  } else {
-    showDecisionModal();
-  }
-}
+
+    if(!sessionMode && trialEndsAtParam && Number.isFinite(trialEndsAtParam)) {
+      if (trialEndsAtParam > Date.now()) {
+        sessionMode = "trial";
+        trialEndsAt = trialEndsAtParam;
+        applySessionUi();
+        startTrialCountdown();
+      } else {
+        showDecisionModal();
+      }
+    }
 
     connect();
   </script>
