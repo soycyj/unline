@@ -864,6 +864,18 @@
     setVoiceState("Idle");
     updateToolUi();
     updateVoiceUi();
+    // fallback: URL에 trialEndsAt이 있으면 WS가 늦어도 타이머는 즉시 노출
+if (!sessionMode && trialEndsAtParam && Number.isFinite(trialEndsAtParam)) {
+  if (trialEndsAtParam > Date.now()) {
+    sessionMode = "trial";
+    trialEndsAt = trialEndsAtParam;
+    applySessionUi();
+    startTrialCountdown();
+  } else {
+    showDecisionModal();
+  }
+}
+
     connect();
   </script>
 </body>
