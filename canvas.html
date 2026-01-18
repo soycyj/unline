@@ -433,7 +433,7 @@
 
       // session fields
       sessionMode = payload.sessionMode || sessionMode || null;
-      trialEndsAt = payload.trialEndsAt || trialEndsAtParam || null;
+      trialEndsAt = payload.trialEndsAt || trialEndsAtParam || trialEndsAt || null;
       sessionId = payload.sessionId || sessionIdParam || null;
 
       $("roleTxt").textContent = currentRole;
