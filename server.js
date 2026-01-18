@@ -8,10 +8,11 @@ const { WebSocketServer } = require("ws");
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
-// 정적 파일을 현재 디렉터리(루트)에서 바로 제공
-const PUBLIC_DIR = __dirname;
+// public 폴더를 정적 파일 루트로 고정
+const PUBLIC_DIR = path.join(__dirname, "public");
 app.use(express.static(PUBLIC_DIR));
 
+// 루트 접속은 무조건 public/canvas.html로 보냄
 app.get("/", (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "canvas.html"));
 });
