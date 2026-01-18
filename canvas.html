@@ -267,6 +267,7 @@
         <h3>Voice</h3>
         <div class="row">
           <button class="primary" id="startVoiceBtn">Start voice</button>
+          <button id="enableAudioBtn">Enable audio</button>
           <button class="danger" id="stopVoiceBtn" disabled>Stop</button>
         </div>
         <p class="small" id="voiceState">Idle</p>
@@ -759,6 +760,15 @@
       const stream = await ensureLocalAudio();
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
     }
+      $("enableAudioBtn").addEventListener("click", async () => {
+  try {
+    const a = $("remoteAudio");
+    await a.play();
+    alert("Audio enabled");
+  } catch (e) {
+    alert("Audio enable failed. Try again after starting voice.");
+  }
+});
 
     $("startVoiceBtn").addEventListener("click", async () => {
       if(!userProvidedClientId){ alert("voice는 참가자 링크로 입장한 사람만 사용할 수 있습니다"); return; }
