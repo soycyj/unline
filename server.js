@@ -8,7 +8,12 @@ const { WebSocketServer } = require("ws");
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
-const PUBLIC_DIR = path.join(__dirname, "public");
+// 정적 파일을 현재 디렉터리(루트)에서 바로 제공
+const PUBLIC_DIR = __dirname;
+app.use(express.static(PUBLIC_DIR));
+
+// 정적 파일을 현재 디렉터리(루트)에서 바로 제공
+const PUBLIC_DIR = __dirname;
 app.use(express.static(PUBLIC_DIR));
 
 const PORT = process.env.PORT || 3000;
