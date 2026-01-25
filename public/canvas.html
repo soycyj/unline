@@ -3,537 +3,102 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Unline Canvas</title>
+  <title>Unline Voice</title>
   <style>
-    :root{
-      --bg:#0b0d10;
-      --panel:rgba(20,24,33,0.92);
-      --line:rgba(39,48,68,0.9);
-      --text:#e8eef9;
-      --muted:#a9b4c7;
-      --btn:#1f6feb;
-      --btn2:#2b3242;
-      --danger:#ef4444;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;
-      background:var(--bg);
-      color:var(--text);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto;
-      display:flex;
-      flex-direction:column;
-      min-height:100%;
-    }
-    .topbar{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      padding:10px 12px;
-      border-bottom:1px solid var(--line);
-      background:rgba(10,12,16,0.6);
-      position:sticky;
-      top:0;
-      z-index:20;
-      backdrop-filter: blur(6px);
-    }
-    .left,.right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .pill{
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(20,24,33,0.6);
-      font-size:12px;
-      color:var(--muted);
-      white-space:nowrap;
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      font-weight:900;
-    }
+    :root{--bg:#0b0d10;--panel:rgba(20,24,33,0.92);--line:rgba(39,48,68,0.9);--text:#e8eef9;--muted:#a9b4c7;--btn:#1f6feb;--btn2:#2b3242;--danger:#ef4444}
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto;display:flex;flex-direction:column}
+    .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--line);background:rgba(10,12,16,0.6);position:sticky;top:0}
+    .left,.right{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .pill{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(20,24,33,0.6);font-size:12px;color:var(--muted);font-weight:900}
     .pill strong{color:var(--text)}
-    .status{
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      font-size:12px;
-      font-weight:900;
-    }
-    .online{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
-    .offline{color:#450a0a;background:rgba(239,68,68,0.16);border-color:rgba(239,68,68,0.35)}
-    button{
-      padding:10px 12px;
-      border:1px solid var(--line);
-      border-radius:12px;
-      cursor:pointer;
-      color:var(--text);
-      background:var(--btn2);
-      font-weight:900;
-      font-size:13px;
-      -webkit-tap-highlight-color: transparent;
-    }
+    button{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--btn2);color:var(--text);font-weight:900;cursor:pointer}
     button.primary{background:var(--btn);border-color:rgba(31,111,235,0.75)}
     button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
     button:disabled{opacity:0.55;cursor:not-allowed}
-    input{
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid var(--line);
-      background:rgba(10,12,16,0.55);
-      color:var(--text);
-      font-weight:900;
-      font-size:13px;
-      outline:none;
-      width:160px;
-    }
-    input[type="color"]{
-      width:44px;
-      height:40px;
-      padding:0;
-      border-radius:12px;
-      border:1px solid var(--line);
-      background:rgba(10,12,16,0.55);
-    }
-    input[type="range"]{
-      width:140px;
-      accent-color: var(--btn);
-    }
-    .wrap{
-      flex:1;
-      display:grid;
-      grid-template-columns:260px 1fr 320px;
-      gap:12px;
-      padding:12px;
-      overflow:auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .col{display:flex;flex-direction:column;gap:12px}
-    .card{
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:16px;
-      padding:12px;
-    }
-    .card h3{margin:0 0 10px;font-size:13px;color:var(--muted);font-weight:900;text-transform:uppercase}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .small{font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0 0}
-    .stage{
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:16px;
-      overflow:hidden;
-      position:relative;
-      min-height:360px;
-    }
-    canvas{
-      width:100%;
-      height:100%;
-      display:block;
-      touch-action:none;
-      background:rgba(10,12,16,0.55);
-    }
-    .userRow{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      padding:8px 10px;
-      border:1px solid var(--line);
-      border-radius:14px;
-      background:rgba(10,12,16,0.35);
-      margin-top:8px;
-    }
-    .badge{
-      width:12px;height:12px;border-radius:4px;border:1px solid var(--line);
-    }
-    @media (max-width:1060px){
-      .wrap{grid-template-columns:1fr}
-      input{width:140px}
-      .stage{min-height:420px}
-      input[type="range"]{width:120px}
-    }
+    .wrap{display:grid;grid-template-columns:1fr;gap:12px;padding:12px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+    .small{margin:8px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
   </style>
 </head>
 <body>
-  <div class="topbar">
+  <div class="bar">
     <div class="left">
-      <div id="connStatus" class="status offline">Offline</div>
       <div class="pill">Room <strong id="roomTxt"></strong></div>
       <div class="pill">Role <strong id="roleTxt">viewer</strong></div>
       <div class="pill">Visitors <strong id="visitorsTxt">0</strong></div>
-      <div class="pill">Session <strong id="sessionTxt">waiting</strong></div>
+      <div class="pill">WS <strong id="wsTxt">offline</strong></div>
+      <div class="pill">BUILD <strong id="buildTxt">na</strong></div>
     </div>
-
     <div class="right">
       <button id="homeBtn">Home</button>
-
-      <button id="penBtn" class="primary">Pen</button>
-      <button id="eraserBtn">Eraser</button>
-
-      <input id="colorInput" type="color" value="#e8eef9" />
-      <div style="display:flex;align-items:center;gap:8px">
-        <input id="widthInput" type="range" min="1" max="18" value="3" />
-        <span id="widthTxt" class="pill" style="padding:6px 8px">3</span>
-      </div>
-
-      <input id="roomInput" placeholder="Room code" />
-      <button id="goRoomBtn">Go</button>
-      <button id="clearBtn" class="danger">Clear</button>
     </div>
   </div>
 
   <div class="wrap">
-    <div class="col">
-      <div class="card">
-        <h3>Access</h3>
-        <div class="row">
-          <button id="readyBtn" class="primary">Ready</button>
-        </div>
-        <p class="small" id="readyHint"></p>
-
-        <div id="manageBox" style="display:none;margin-top:10px">
-          <h3 style="margin:12px 0 0">Participants</h3>
-          <p class="small">toggle participant access</p>
-          <div id="userList"></div>
-        </div>
+    <div class="card">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button id="enableAudioBtn">Enable audio</button>
+        <button id="startVoiceBtn" class="primary">Start voice</button>
+        <button id="stopVoiceBtn" class="danger" disabled>Stop</button>
       </div>
-
-      <div class="card">
-        <h3>Voice</h3>
-        <div class="row">
-          <button id="startVoiceBtn" class="primary">Start voice</button>
-          <button id="enableAudioBtn">Enable audio</button>
-          <button id="stopVoiceBtn" class="danger" disabled>Stop</button>
-        </div>
-        <p class="small" id="voiceState">Idle</p>
-        <p class="small" id="rtcDbg"></p>
-        <audio id="remoteAudio" autoplay playsinline></audio>
-      </div>
-    </div>
-
-    <div class="stage">
-      <canvas id="board"></canvas>
-    </div>
-
-    <div class="col">
-      <div class="card">
-        <h3>Status</h3>
-        <p class="small" id="statusHint"></p>
-      </div>
+      <p class="small" id="voiceState">Idle</p>
+      <p class="small" id="dbg"></p>
+      <audio id="remoteAudio" autoplay playsinline></audio>
     </div>
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
-
     const qs = new URLSearchParams(location.search);
-    let room = (qs.get("room") || "TEST").trim();
+
+    const room = (qs.get("room") || "VOICE01").trim();
+    const clientId = (qs.get("clientId") || ("c" + Math.random().toString(16).slice(2,10))).trim();
+    const label = (qs.get("label") || "").trim();
+
     $("roomTxt").textContent = room;
-    $("roomInput").value = room;
 
-    let clientId = (qs.get("clientId") || "").trim();
-    if (!clientId) {
-      const key = "unline_clientId";
-      clientId = localStorage.getItem(key) || ("c" + Math.random().toString(16).slice(2, 10));
-      localStorage.setItem(key, clientId);
-    }
+    $("homeBtn").addEventListener("click", () => location.href = "/");
 
-    const toolKey = "unline_tool";
-    const colorKey = "unline_penColor";
-    const widthKey = "unline_penWidth";
+    function dbg(t){ $("dbg").textContent = t || ""; }
 
-    let toolMode = localStorage.getItem(toolKey) || "pen";
-    let penColor = localStorage.getItem(colorKey) || "#e8eef9";
-    let penWidth = Number(localStorage.getItem(widthKey) || 3);
-
-    function syncToolUi(){
-      $("penBtn").classList.toggle("primary", toolMode === "pen");
-      $("eraserBtn").classList.toggle("primary", toolMode === "eraser");
-      $("colorInput").disabled = toolMode !== "pen";
-      $("widthInput").value = String(penWidth);
-      $("widthTxt").textContent = String(penWidth);
-      $("colorInput").value = penColor;
-    }
-
-    $("homeBtn").addEventListener("click", () => { location.href = "/"; });
-
-    $("penBtn").addEventListener("click", () => {
-      toolMode = "pen";
-      localStorage.setItem(toolKey, toolMode);
-      syncToolUi();
-    });
-
-    $("eraserBtn").addEventListener("click", () => {
-      toolMode = "eraser";
-      localStorage.setItem(toolKey, toolMode);
-      syncToolUi();
-    });
-
-    $("colorInput").addEventListener("input", (e) => {
-      penColor = e.target.value || "#e8eef9";
-      localStorage.setItem(colorKey, penColor);
-      syncToolUi();
-    });
-
-    $("widthInput").addEventListener("input", (e) => {
-      const v = Math.max(1, Math.min(18, Number(e.target.value || 3)));
-      penWidth = v;
-      localStorage.setItem(widthKey, String(penWidth));
-      syncToolUi();
-    });
-
-    function setConn(online){
-      const el = $("connStatus");
-      if (online) {
-        el.textContent = "Online";
-        el.classList.remove("offline");
-        el.classList.add("online");
-      } else {
-        el.textContent = "Offline";
-        el.classList.remove("online");
-        el.classList.add("offline");
-      }
-    }
-
-    function setRtcDbg(t){ $("rtcDbg").textContent = t || ""; }
-
-    function buildWsUrl(){
+    function wsUrl(){
       const proto = location.protocol === "https:" ? "wss" : "ws";
-      const label = (qs.get("label") || "").trim();
-      return `${proto}://${location.host}/ws?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}${label ? `&label=${encodeURIComponent(label)}` : ""}`;
+      return `${proto}://${location.host}/ws?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}&label=${encodeURIComponent(label)}`;
     }
 
-    let ws = null;
-    function send(type, data = {}) {
+    let ws;
+    function send(type, data){
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({ type, ...data }));
+      ws.send(JSON.stringify({ type, ...(data || {}) }));
     }
 
     let meRole = "viewer";
     let visitors = 0;
-    let users = [];
-    let sessionState = "waiting";
 
-    function canDraw() { return meRole === "participant"; }
-    function canVoice() { return meRole === "participant"; }
+    function canVoice(){ return meRole === "participant"; }
 
-    function renderUserList() {
-      const box = $("userList");
-      box.textContent = "";
-      for (const u of users) {
-        const row = document.createElement("div");
-        row.className = "userRow";
-
-        const left = document.createElement("div");
-        left.style.display = "flex";
-        left.style.alignItems = "center";
-        left.style.gap = "10px";
-
-        const badge = document.createElement("div");
-        badge.className = "badge";
-        badge.style.background = u.color || "#94a3b8";
-
-        const txt = document.createElement("div");
-        txt.style.fontSize = "12px";
-        txt.style.color = "#a9b4c7";
-        txt.textContent = u.clientId === clientId ? "You" : (u.label || "User");
-
-        left.appendChild(badge);
-        left.appendChild(txt);
-
-        const right = document.createElement("div");
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.checked = u.role === "participant";
-        cb.disabled = u.clientId === clientId;
-        cb.addEventListener("change", () => {
-          send("set_role", { targetClientId: u.clientId, role: cb.checked ? "participant" : "viewer" });
-        });
-        right.appendChild(cb);
-
-        row.appendChild(left);
-        row.appendChild(right);
-        box.appendChild(row);
-      }
-    }
-
-    function updateUi() {
+    function updateUi(){
       $("roleTxt").textContent = meRole;
       $("visitorsTxt").textContent = String(visitors);
-      $("sessionTxt").textContent = sessionState;
-
-      $("clearBtn").disabled = !canDraw();
       $("startVoiceBtn").disabled = !canVoice() || callActive;
       $("stopVoiceBtn").disabled = !callActive;
-
-      $("manageBox").style.display = meRole === "participant" ? "block" : "none";
-      if (meRole === "participant") renderUserList();
-
-      const st = [];
-      if (meRole !== "participant") st.push("viewer");
-      $("statusHint").textContent = st.join(" ");
     }
 
-    function connect() {
-      ws = new WebSocket(buildWsUrl());
+    function setVoiceState(t){ $("voiceState").textContent = t; updateUi(); }
 
-      ws.addEventListener("open", () => {
-        setConn(true);
-        send("hello", {});
-      });
-
-      ws.addEventListener("close", () => { setConn(false); });
-
-      ws.addEventListener("message", (evt) => {
-        let msg;
-        try { msg = JSON.parse(evt.data); } catch { return; }
-
-        if (msg.type === "room_state") {
-          visitors = msg.visitors ?? visitors;
-          users = msg.users ?? users;
-          sessionState = msg.sessionState ?? sessionState;
-
-          const me = users.find(x => x.clientId === clientId);
-          if (me && me.role) meRole = me.role;
-
-          updateUi();
-          return;
-        }
-
-        if (msg.type === "canvas_snapshot") {
-          applySnapshot(msg.strokes || []);
-          return;
-        }
-
-        if (msg.type === "draw") { drawStroke(msg); return; }
-        if (msg.type === "clear") { clearCanvas(false); return; }
-
-        if (msg.type === "voice_request") return onVoiceRequest(msg);
-        if (msg.type === "voice_accept") return onVoiceAccept(msg);
-        if (msg.type === "voice_reject") return onVoiceReject(msg);
-        if (msg.type === "voice_offer") return onVoiceOffer(msg);
-        if (msg.type === "voice_answer") return onVoiceAnswer(msg);
-        if (msg.type === "voice_ice") return onVoiceIce(msg);
-        if (msg.type === "voice_stop") return onVoiceStop(msg);
-      });
-    }
-
-    $("goRoomBtn").addEventListener("click", () => {
-      const nextRoom = ($("roomInput").value || "").trim();
-      if (!nextRoom) return;
-      room = nextRoom;
-      $("roomTxt").textContent = room;
-      if (ws) try { ws.close(); } catch {}
-      clearCanvas(false);
-      connect();
-    });
-
-    const canvas = $("board");
-    const ctx = canvas.getContext("2d");
-
-    function resize(){
-      const rect = canvas.getBoundingClientRect();
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      canvas.width = Math.floor(rect.width * dpr);
-      canvas.height = Math.floor(rect.height * dpr);
-      ctx.setTransform(dpr,0,0,dpr,0,0);
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-    }
-    window.addEventListener("resize", resize);
-    resize();
-
-    function clearCanvas(broadcast) {
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      if (broadcast) send("clear", {});
-    }
-
-    $("clearBtn").addEventListener("click", () => {
-      if (!canDraw()) return;
-      clearCanvas(true);
-    });
-
-    function drawStroke(s) {
-      const a = s.a, b = s.b;
-      const mode = s.mode || "pen";
-      const w = Number(s.w || 3);
-      const color = s.color || "#e8eef9";
-
-      const prev = ctx.globalCompositeOperation;
-      if (mode === "eraser") {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.strokeStyle = "rgba(0,0,0,1)";
-      } else {
-        ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = color;
-      }
-      ctx.lineWidth = w;
-
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-
-      ctx.globalCompositeOperation = prev;
-    }
-
-    function applySnapshot(strokes) {
-      clearCanvas(false);
-      for (const s of strokes) drawStroke(s);
-    }
-
-    function posFromEvent(e){
-      const rect = canvas.getBoundingClientRect();
-      return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
-    }
-
-    let drawing = false;
-    let last = null;
-
-    canvas.addEventListener("pointerdown", (e) => {
-      if (!canDraw()) return;
-      drawing = true;
-      last = posFromEvent(e);
-      canvas.setPointerCapture(e.pointerId);
-    });
-
-    canvas.addEventListener("pointermove", (e) => {
-      if (!drawing) return;
-      const p = posFromEvent(e);
-
-      const stroke = { a: last, b: p, mode: toolMode, color: penColor, w: penWidth };
-      drawStroke(stroke);
-      send("draw", stroke);
-      last = p;
-    });
-
-    canvas.addEventListener("pointerup", () => { drawing = false; last = null; });
-    canvas.addEventListener("pointercancel", () => { drawing = false; last = null; });
-
-    /* WebRTC voice */
     let iceServers = [{ urls: ["stun:stun.l.google.com:19302"] }];
-
-    async function loadIceServers() {
-      try {
+    async function loadIce(){
+      try{
         const r = await fetch("/api/ice", { cache: "no-store" });
         const j = await r.json();
+        if (j && j.build) $("buildTxt").textContent = j.build;
         if (j && j.ok && Array.isArray(j.iceServers) && j.iceServers.length) iceServers = j.iceServers;
-      } catch {}
-    }
-
-    let pc = null;
-    let localStream = null;
-    let callActive = false;
-
-    function setVoiceState(t) {
-      $("voiceState").textContent = t;
-      updateUi();
+      }catch{}
     }
 
     let audioCtx = null;
-    async function unlockAudio() {
+    async function unlockAudio(){
       const a = $("remoteAudio");
       try { await a.play(); } catch {}
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -543,7 +108,11 @@
       }
     }
 
-    async function ensureLocalAudio() {
+    let pc = null;
+    let localStream = null;
+    let callActive = false;
+
+    async function ensureLocalAudio(){
       if (localStream) return localStream;
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true },
@@ -552,56 +121,54 @@
       return localStream;
     }
 
-    async function createPeer() {
+    async function createPeer(){
       pc = new RTCPeerConnection({ iceServers });
 
       pc.onicecandidate = (e) => {
         if (e.candidate) send("voice_ice", { candidate: e.candidate });
       };
 
-      pc.oniceconnectionstatechange = () => setRtcDbg("ice " + pc.iceConnectionState);
-      pc.onconnectionstatechange = () => setRtcDbg("conn " + pc.connectionState);
+      pc.oniceconnectionstatechange = () => dbg("ice " + pc.iceConnectionState);
+      pc.onconnectionstatechange = () => dbg("conn " + pc.connectionState);
 
       pc.ontrack = async (e) => {
         const stream = e.streams && e.streams[0];
         if (!stream) return;
         const a = $("remoteAudio");
         a.srcObject = stream;
-        try { await a.play(); setRtcDbg("remote audio playing"); }
-        catch { setRtcDbg("remote audio blocked"); }
+        try { await a.play(); dbg("remote playing"); }
+        catch { dbg("remote blocked"); }
       };
 
       const s = await ensureLocalAudio();
       s.getTracks().forEach(t => pc.addTrack(t, s));
     }
 
-    function teardownVoice(state) {
+    function teardown(reason){
       try { if (pc) pc.close(); } catch {}
       pc = null;
-      try {
-        if (localStream) localStream.getTracks().forEach(t => t.stop());
-      } catch {}
+      try { if (localStream) localStream.getTracks().forEach(t => t.stop()); } catch {}
       localStream = null;
       callActive = false;
-      setVoiceState(state || "Idle");
-      setRtcDbg("");
+      setVoiceState(reason || "Idle");
+      dbg("");
     }
 
     $("enableAudioBtn").addEventListener("click", async () => {
       await unlockAudio();
-      setRtcDbg("audio unlocked");
+      dbg("audio unlocked");
     });
 
     $("startVoiceBtn").addEventListener("click", async () => {
-      setRtcDbg("start tapped");
+      dbg("start tapped");
       await unlockAudio();
 
-      if (!canVoice()) { setRtcDbg("blocked role"); return; }
-      if (!ws || ws.readyState !== WebSocket.OPEN) { setRtcDbg("blocked ws"); return; }
+      if (!canVoice()) { dbg("blocked role"); return; }
+      if (!ws || ws.readyState !== WebSocket.OPEN) { dbg("ws not open"); return; }
       if (callActive) return;
 
       try { await ensureLocalAudio(); }
-      catch { setRtcDbg("mic denied"); return; }
+      catch { dbg("mic denied"); return; }
 
       setVoiceState("Requesting");
       send("voice_request", {});
@@ -610,23 +177,23 @@
     $("stopVoiceBtn").addEventListener("click", () => {
       if (!callActive) return;
       send("voice_stop", {});
-      teardownVoice("Stopped");
+      teardown("Stopped");
     });
 
-    function onVoiceRequest() {
+    function onVoiceRequest(){
       if (!canVoice()) { send("voice_reject", { reason: "not_allowed" }); return; }
       if (callActive) { send("voice_reject", { reason: "busy" }); return; }
 
-      const ok = confirm("Voice request received. Accept");
+      const ok = confirm("Voice request. Accept");
       if (!ok) { send("voice_reject", { reason: "rejected" }); return; }
 
       send("voice_accept", {});
       setVoiceState("Accepted");
     }
 
-    async function onVoiceAccept() {
+    async function onVoiceAccept(){
       if (callActive) return;
-      try {
+      try{
         callActive = true;
         setVoiceState("Creating offer");
         await createPeer();
@@ -634,18 +201,18 @@
         await pc.setLocalDescription(offer);
         send("voice_offer", { sdp: offer });
         setVoiceState("Offer sent");
-      } catch {
-        teardownVoice("Voice error");
+      }catch{
+        teardown("Voice error");
       }
     }
 
-    function onVoiceReject() {
+    function onVoiceReject(){
       callActive = false;
       setVoiceState("Rejected");
     }
 
-    async function onVoiceOffer(msg) {
-      try {
+    async function onVoiceOffer(msg){
+      try{
         if (!callActive) callActive = true;
         setVoiceState("Received offer");
         await createPeer();
@@ -654,38 +221,62 @@
         await pc.setLocalDescription(answer);
         send("voice_answer", { sdp: answer });
         setVoiceState("Answer sent");
-      } catch {
-        teardownVoice("Voice error");
+      }catch{
+        teardown("Voice error");
       }
     }
 
-    async function onVoiceAnswer(msg) {
+    async function onVoiceAnswer(msg){
       if (!pc) return;
-      try {
+      try{
         await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
         setVoiceState("Connected");
-      } catch {
-        teardownVoice("Voice error");
+      }catch{
+        teardown("Voice error");
       }
     }
 
-    async function onVoiceIce(msg) {
+    async function onVoiceIce(msg){
       if (!pc || !msg || !msg.candidate) return;
       try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
     }
 
-    function onVoiceStop() { teardownVoice("Peer stopped"); }
+    function onVoiceStop(){ teardown("Peer stopped"); }
 
-    $("readyBtn").addEventListener("click", () => {
-      const next = $("readyBtn").textContent === "Ready";
-      $("readyBtn").textContent = next ? "Ready on" : "Ready";
-      send("ready_set", { ready: next });
-    });
+    async function boot(){
+      await loadIce();
 
-    async function boot() {
-      syncToolUi();
-      await loadIceServers();
-      connect();
+      ws = new WebSocket(wsUrl());
+
+      ws.addEventListener("open", () => {
+        $("wsTxt").textContent = "online";
+      });
+
+      ws.addEventListener("close", () => {
+        $("wsTxt").textContent = "offline";
+      });
+
+      ws.addEventListener("message", (evt) => {
+        let msg;
+        try { msg = JSON.parse(evt.data); } catch { return; }
+
+        if (msg.type === "room_state") {
+          visitors = msg.visitors || 0;
+          const me = (msg.users || []).find(u => u.clientId === clientId);
+          if (me && me.role) meRole = me.role;
+          updateUi();
+          return;
+        }
+
+        if (msg.type === "voice_request") return onVoiceRequest();
+        if (msg.type === "voice_accept") return onVoiceAccept();
+        if (msg.type === "voice_reject") return onVoiceReject();
+        if (msg.type === "voice_offer") return onVoiceOffer(msg);
+        if (msg.type === "voice_answer") return onVoiceAnswer(msg);
+        if (msg.type === "voice_ice") return onVoiceIce(msg);
+        if (msg.type === "voice_stop") return onVoiceStop();
+      });
+
       updateUi();
     }
 
