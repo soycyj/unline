@@ -244,6 +244,43 @@
       .right .desktopTools{display:none}
       .wrap{padding-bottom:86px}
     }
+/* =========================
+   MOBILE TOPBAR COMPRESSION
+   ========================= */
+@media (max-width: 768px) {
+
+  .topbar {
+    padding: 4px 8px;
+    min-height: 44px;
+  }
+
+  .left {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .brand {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .roomLine {
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
+
+  .desktopTools {
+    display: none !important;
+  }
+
+  .wrap {
+    padding-top: 6px;
+  }
+}
   </style>
 </head>
 <body>
