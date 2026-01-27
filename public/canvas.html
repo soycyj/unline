@@ -3,154 +3,178 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Unline Canvas Voice</title>
+  <title>unline</title>
   <style>
     :root{
-      --bg:#0b0d10;
-      --panel:rgba(20,24,33,0.92);
-      --line:rgba(39,48,68,0.9);
-      --text:#e8eef9;
-      --muted:#a9b4c7;
-      --btn:#1f6feb;
-      --btn2:#2b3242;
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --line:#e6eaf2;
+      --text:#0b1220;
+      --muted:#5a677f;
+      --btn:#2563eb;
+      --btn2:#0f172a;
       --danger:#ef4444;
+      --shadow: 0 12px 40px rgba(15,23,42,0.08);
+      --radius:18px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
       margin:0;
-      background:var(--bg);
+      background:radial-gradient(1200px 600px at 20% 10%, #eaf2ff 0%, rgba(234,242,255,0) 60%),
+                 radial-gradient(900px 500px at 80% 0%, #f1ecff 0%, rgba(241,236,255,0) 55%),
+                 var(--bg);
       color:var(--text);
       font-family:system-ui,-apple-system,Segoe UI,Roboto;
       display:flex;
       flex-direction:column;
+      min-height:100%;
     }
     .topbar{
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:12px;
-      padding:10px 12px;
+      padding:12px 14px;
       border-bottom:1px solid var(--line);
-      background:rgba(10,12,16,0.6);
+      background:rgba(255,255,255,0.72);
+      backdrop-filter: blur(10px);
       position:sticky;
       top:0;
       z-index:20;
-      backdrop-filter: blur(6px);
     }
     .left,.right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .pill{
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      background:rgba(20,24,33,0.6);
-      font-size:12px;
-      color:var(--muted);
-      white-space:nowrap;
-      display:inline-flex;
+    .brand{
+      display:flex;
       align-items:center;
-      gap:6px;
-      font-weight:900;
+      gap:10px;
+      font-weight:950;
+      letter-spacing:-0.02em;
     }
-    .pill strong{color:var(--text)}
-    .status{
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
+    .brand .sub{
+      font-weight:800;
+      color:var(--muted);
       font-size:12px;
-      font-weight:900;
     }
-    .online{color:#052e12;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4)}
-    .offline{color:#450a0a;background:rgba(239,68,68,0.16);border-color:rgba(239,68,68,0.35)}
     button{
       padding:10px 12px;
       border:1px solid var(--line);
-      border-radius:12px;
+      border-radius:14px;
       cursor:pointer;
       color:var(--text);
-      background:var(--btn2);
-      font-weight:900;
+      background:#f2f5fb;
+      font-weight:950;
       font-size:13px;
+      box-shadow:0 8px 20px rgba(15,23,42,0.06);
       -webkit-tap-highlight-color: transparent;
     }
-    button.primary{background:var(--btn);border-color:rgba(31,111,235,0.75)}
-    button.danger{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.35);color:#fecaca}
+    button.primary{
+      background:var(--btn);
+      border-color:rgba(37,99,235,0.35);
+      color:#fff;
+    }
+    button.danger{
+      background:rgba(239,68,68,0.08);
+      border-color:rgba(239,68,68,0.25);
+      color:#b91c1c;
+    }
     button:disabled{opacity:0.55;cursor:not-allowed}
     input{
       padding:10px 12px;
-      border-radius:12px;
+      border-radius:14px;
       border:1px solid var(--line);
-      background:rgba(10,12,16,0.55);
+      background:#fbfcff;
       color:var(--text);
       font-weight:900;
       font-size:13px;
       outline:none;
-      width:160px;
+      width:170px;
     }
     input[type="color"]{
       width:44px;
       height:40px;
       padding:0;
-      border-radius:12px;
+      border-radius:14px;
       border:1px solid var(--line);
-      background:rgba(10,12,16,0.55);
+      background:#fbfcff;
     }
     input[type="range"]{
       width:140px;
       accent-color: var(--btn);
     }
+
     .wrap{
       flex:1;
       display:grid;
-      grid-template-columns:260px 1fr 320px;
-      gap:12px;
-      padding:12px;
+      grid-template-columns:280px 1fr;
+      gap:14px;
+      padding:14px;
       overflow:auto;
       -webkit-overflow-scrolling: touch;
     }
-    .col{display:flex;flex-direction:column;gap:12px}
+    .col{display:flex;flex-direction:column;gap:14px}
     .card{
-      background:var(--panel);
+      background:var(--card);
       border:1px solid var(--line);
-      border-radius:16px;
-      padding:12px;
+      border-radius:var(--radius);
+      padding:14px;
+      box-shadow:var(--shadow);
     }
-    .card h3{margin:0 0 10px;font-size:13px;color:var(--muted);font-weight:900;text-transform:uppercase}
+    .card h3{
+      margin:0 0 12px;
+      font-size:12px;
+      color:var(--muted);
+      font-weight:950;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+    }
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .small{font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0 0;white-space:pre-wrap}
+
     .stage{
-      background:var(--panel);
+      background:var(--card);
       border:1px solid var(--line);
-      border-radius:16px;
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
       overflow:hidden;
       position:relative;
-      min-height:360px;
+      min-height:520px;
     }
     canvas{
       width:100%;
       height:100%;
       display:block;
       touch-action:none;
-      background:rgba(10,12,16,0.55);
+      background:linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
     }
+
     .userRow{
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:10px;
-      padding:8px 10px;
+      padding:10px 12px;
       border:1px solid var(--line);
-      border-radius:14px;
-      background:rgba(10,12,16,0.35);
-      margin-top:8px;
+      border-radius:16px;
+      background:#fbfcff;
+      margin-top:10px;
     }
     .badge{
-      width:12px;height:12px;border-radius:4px;border:1px solid var(--line);
+      width:12px;height:12px;border-radius:5px;border:1px solid var(--line);
     }
+    .meta{
+      font-size:12px;
+      color:var(--muted);
+      font-weight:800;
+      line-height:1.45;
+      margin-top:10px;
+    }
+
+    /* hide status noise */
+    #connStatus, #wsTxt, #rtcTxt, #voiceState, #dbg { display:none; }
+
     @media (max-width:1060px){
       .wrap{grid-template-columns:1fr}
-      input{width:140px}
-      .stage{min-height:420px}
+      .stage{min-height:520px}
       input[type="range"]{width:120px}
     }
   </style>
@@ -158,12 +182,10 @@
 <body>
   <div class="topbar">
     <div class="left">
-      <div id="connStatus" class="status offline">Offline</div>
-      <div class="pill">Room <strong id="roomTxt"></strong></div>
-      <div class="pill">Role <strong id="roleTxt">viewer</strong></div>
-      <div class="pill">Visitors <strong id="visitorsTxt">0</strong></div>
-      <div class="pill">WS <strong id="wsTxt">offline</strong></div>
-      <div class="pill">RTC <strong id="rtcTxt">idle</strong></div>
+      <div class="brand">
+        <span>unline</span>
+        <span class="sub" id="roomTxt"></span>
+      </div>
     </div>
 
     <div class="right">
@@ -172,13 +194,13 @@
       <button id="penBtn" class="primary">Pen</button>
       <button id="eraserBtn">Eraser</button>
 
-      <input id="colorInput" type="color" value="#e8eef9" />
-      <div style="display:flex;align-items:center;gap:8px">
+      <input id="colorInput" type="color" value="#111827" />
+      <div style="display:flex;align-items:center;gap:10px">
         <input id="widthInput" type="range" min="1" max="18" value="3" />
-        <span id="widthTxt" class="pill" style="padding:6px 8px">3</span>
+        <span id="widthTxt" style="font-weight:950;color:var(--muted)">3</span>
       </div>
 
-      <input id="roomInput" placeholder="Room code" />
+      <input id="roomInput" placeholder="Room" />
       <button id="goRoomBtn">Go</button>
       <button id="clearBtn" class="danger">Clear</button>
     </div>
@@ -187,17 +209,11 @@
   <div class="wrap">
     <div class="col">
       <div class="card">
-        <h3>Access</h3>
-        <div class="row">
-          <button id="readyBtn" class="primary">Ready</button>
-        </div>
-        <p class="small" id="readyHint"></p>
-
-        <div id="manageBox" style="display:none;margin-top:10px">
-          <h3 style="margin:12px 0 0">Participants</h3>
-          <p class="small">toggle participant access</p>
+        <h3>People</h3>
+        <div id="manageBox" style="display:none">
           <div id="userList"></div>
         </div>
+        <div class="meta" id="hintTxt"></div>
       </div>
 
       <div class="card">
@@ -206,21 +222,12 @@
           <button id="startVoiceBtn" class="primary">Start voice</button>
           <button id="stopVoiceBtn" class="danger" disabled>Stop</button>
         </div>
-        <p class="small" id="voiceState">Idle</p>
-        <p class="small" id="dbg"></p>
         <audio id="remoteAudio" autoplay playsinline></audio>
       </div>
     </div>
 
     <div class="stage">
       <canvas id="board"></canvas>
-    </div>
-
-    <div class="col">
-      <div class="card">
-        <h3>Status</h3>
-        <p class="small" id="statusHint"></p>
-      </div>
     </div>
   </div>
 
@@ -229,6 +236,8 @@
 
     const qs = new URLSearchParams(location.search);
     let room = (qs.get("room") || "VOICE01").trim();
+    $("roomTxt").textContent = "Room " + room;
+    $("roomInput").value = room;
 
     let clientId = (qs.get("clientId") || "").trim();
     if (!clientId) {
@@ -239,34 +248,18 @@
 
     const label = (qs.get("label") || "").trim();
 
-    $("roomTxt").textContent = room;
-    $("roomInput").value = room;
-
     const toolKey = "unline_tool";
     const colorKey = "unline_penColor";
     const widthKey = "unline_penWidth";
 
     let toolMode = localStorage.getItem(toolKey) || "pen";
-    let penColor = localStorage.getItem(colorKey) || "#e8eef9";
+    let penColor = localStorage.getItem(colorKey) || "#111827";
     let penWidth = Number(localStorage.getItem(widthKey) || 3);
 
-    function dbg(t){ $("dbg").textContent = t || ""; }
-
-    function setConn(online){
-      const el = $("connStatus");
-      if (online) {
-        el.textContent = "Online";
-        el.classList.remove("offline");
-        el.classList.add("online");
-      } else {
-        el.textContent = "Offline";
-        el.classList.remove("online");
-        el.classList.add("offline");
-      }
-    }
-
-    function setWsState(t){ $("wsTxt").textContent = t || "offline"; }
-    function setRtcState(t){ $("rtcTxt").textContent = t || "idle"; }
+    function dbg(t){ const el = $("dbg"); if (el) el.textContent = t || ""; }
+    function setConn(online){ const el = $("connStatus"); if (!el) return; el.textContent = online ? "Online" : "Offline"; }
+    function setWsState(t){ const el = $("wsTxt"); if (el) el.textContent = t || "offline"; }
+    function setRtcState(t){ const el = $("rtcTxt"); if (el) el.textContent = t || "idle"; }
 
     function syncToolUi(){
       $("penBtn").classList.toggle("primary", toolMode === "pen");
@@ -292,7 +285,7 @@
     });
 
     $("colorInput").addEventListener("input", (e) => {
-      penColor = e.target.value || "#e8eef9";
+      penColor = e.target.value || "#111827";
       localStorage.setItem(colorKey, penColor);
       syncToolUi();
     });
@@ -340,9 +333,10 @@
         badge.style.background = u.color || "#94a3b8";
 
         const txt = document.createElement("div");
-        txt.style.fontSize = "12px";
-        txt.style.color = "#a9b4c7";
-        txt.textContent = u.clientId === clientId ? "You" : (u.label || "User");
+        txt.style.fontSize = "13px";
+        txt.style.fontWeight = "950";
+        txt.style.color = "var(--text)";
+        txt.textContent = u.clientId === clientId ? "You" : (u.label || "Member");
 
         left.appendChild(badge);
         left.appendChild(txt);
@@ -360,14 +354,10 @@
         row.appendChild(left);
         row.appendChild(right);
         box.appendChild(row);
-        box.appendChild(row);
       }
     }
 
     function updateUi() {
-      $("roleTxt").textContent = meRole;
-      $("visitorsTxt").textContent = String(visitors);
-
       $("clearBtn").disabled = !canDraw();
       $("startVoiceBtn").disabled = !canVoice() || callActive;
       $("stopVoiceBtn").disabled = !callActive;
@@ -375,7 +365,11 @@
       $("manageBox").style.display = meRole === "participant" ? "block" : "none";
       if (meRole === "participant") renderUserList();
 
-      $("statusHint").textContent = `room ${room}\nclient ${clientId}\nlabel ${label || "none"}`;
+      const hint = [];
+      hint.push("Invite a friend with the same room code");
+      hint.push("Voice and live drawing work when both are participants");
+      hint.push("Visitors " + String(visitors));
+      $("hintTxt").textContent = hint.join("\n");
     }
 
     function connect() {
@@ -430,24 +424,21 @@
       const nextRoom = ($("roomInput").value || "").trim();
       if (!nextRoom) return;
       room = nextRoom;
-      $("roomTxt").textContent = room;
+      $("roomTxt").textContent = "Room " + room;
 
       if (ws) { try { ws.close(); } catch {} }
       clearCanvas(false);
       connect();
     });
 
-    /* canvas draw */
     const canvas = $("board");
     const ctx = canvas.getContext("2d");
 
     function resize(){
       const rect = canvas.getBoundingClientRect();
       const dpr = Math.max(1, window.devicePixelRatio || 1);
-
       canvas.width = Math.floor(rect.width * dpr);
       canvas.height = Math.floor(rect.height * dpr);
-
       ctx.setTransform(dpr,0,0,dpr,0,0);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
@@ -469,10 +460,9 @@
       const a = s.a, b = s.b;
       const mode = s.mode || "pen";
       const w = Number(s.w || 3);
-      const color = s.color || "#e8eef9";
+      const color = s.color || "#111827";
 
       const prev = ctx.globalCompositeOperation;
-
       if (mode === "eraser") {
         ctx.globalCompositeOperation = "destination-out";
         ctx.strokeStyle = "rgba(0,0,0,1)";
@@ -523,7 +513,6 @@
     canvas.addEventListener("pointerup", () => { drawing = false; last = null; });
     canvas.addEventListener("pointercancel", () => { drawing = false; last = null; });
 
-    /* voice */
     let iceServers = [{ urls: ["stun:stun.l.google.com:19302"] }];
 
     async function loadIceServers() {
@@ -556,19 +545,18 @@
     let callActive = false;
 
     function setVoiceState(t) {
-      $("voiceState").textContent = t || "Idle";
+      const el = $("voiceState");
+      if (el) el.textContent = t || "Idle";
       setRtcState(t || "idle");
       updateUi();
     }
 
     async function ensureLocalAudio() {
       if (localStream) return localStream;
-
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true },
         video: false
       });
-
       return localStream;
     }
 
@@ -579,21 +567,12 @@
         if (e.candidate) send("voice_ice", { candidate: e.candidate });
       };
 
-      pc.oniceconnectionstatechange = () => {
-        setRtcState("ice " + pc.iceConnectionState);
-      };
-
-      pc.onconnectionstatechange = () => {
-        setRtcState("conn " + pc.connectionState);
-      };
-
       pc.ontrack = async (e) => {
         const stream = e.streams && e.streams[0];
-        if (!stream) { dbg("ontrack no stream"); return; }
+        if (!stream) return;
         const a = $("remoteAudio");
         a.srcObject = stream;
-        try { await a.play(); dbg("remote playing"); }
-        catch { dbg("remote blocked"); }
+        try { await a.play(); } catch {}
       };
 
       const s = await ensureLocalAudio();
@@ -613,20 +592,17 @@
     }
 
     $("startVoiceBtn").addEventListener("click", async () => {
-      dbg("start tapped");
-
-      if (!canVoice()) { dbg("blocked role"); return; }
-      if (!ws || ws.readyState !== WebSocket.OPEN) { dbg("ws not open"); return; }
-      if (callActive) { dbg("already active"); return; }
+      if (!canVoice()) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (callActive) return;
 
       setVoiceState("Requesting");
       unlockAudioNoWait();
 
-      try { await ensureLocalAudio(); dbg("mic ok"); }
-      catch { setVoiceState("Idle"); dbg("mic denied"); return; }
+      try { await ensureLocalAudio(); }
+      catch { setVoiceState("Idle"); return; }
 
       send("voice_request", {});
-      dbg("voice_request sent");
     });
 
     $("stopVoiceBtn").addEventListener("click", () => {
@@ -639,92 +615,72 @@
       if (!canVoice()) { send("voice_reject", { reason: "not_allowed" }); return; }
       if (callActive) { send("voice_reject", { reason: "busy" }); return; }
 
-      const ok = confirm("Voice request received. Accept");
+      const ok = confirm("Join voice call");
       if (!ok) { send("voice_reject", { reason: "rejected" }); return; }
 
       unlockAudioNoWait();
       send("voice_accept", {});
       setVoiceState("Accepted");
-      dbg("accepted");
     }
 
     async function onVoiceAccept() {
       try {
         callActive = true;
-        setVoiceState("Creating offer");
+        setVoiceState("Connecting");
 
         await createPeer();
-        dbg("peer created");
 
         const offer = await pc.createOffer({ offerToReceiveAudio: true });
         await pc.setLocalDescription(offer);
 
         send("voice_offer", { sdp: offer });
-        setVoiceState("Offer sent");
-        dbg("offer sent");
+        setVoiceState("Connecting");
       } catch {
         teardownVoice("Voice error");
-        dbg("offer flow error");
       }
     }
 
     function onVoiceReject() {
       callActive = false;
       setVoiceState("Rejected");
-      dbg("rejected");
     }
 
     async function onVoiceOffer(msg) {
       try {
         callActive = true;
-        setVoiceState("Received offer");
+        setVoiceState("Connecting");
 
         await createPeer();
-        dbg("peer created");
-
         await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-        dbg("remote desc set");
 
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
         send("voice_answer", { sdp: answer });
-        setVoiceState("Answer sent");
-        dbg("answer sent");
+        setVoiceState("Connecting");
       } catch {
         teardownVoice("Voice error");
-        dbg("answer flow error");
       }
     }
 
     async function onVoiceAnswer(msg) {
-      if (!pc) { dbg("no pc"); return; }
+      if (!pc) return;
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
         setVoiceState("Connected");
-        dbg("connected");
       } catch {
         teardownVoice("Voice error");
-        dbg("set answer error");
       }
     }
 
     async function onVoiceIce(msg) {
       if (!pc || !msg || !msg.candidate) return;
-      try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); }
-      catch { dbg("ice add fail"); }
+      try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
     }
 
     function onVoiceStop() {
       teardownVoice("Peer stopped");
-      dbg("peer stopped");
     }
-
-    $("readyBtn").addEventListener("click", () => {
-      const isOn = $("readyBtn").textContent !== "Ready on";
-      $("readyBtn").textContent = isOn ? "Ready on" : "Ready";
-      send("ready_set", { ready: isOn });
-    });
 
     async function boot() {
       syncToolUi();
