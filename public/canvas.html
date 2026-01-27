@@ -315,7 +315,7 @@
     const $ = (id) => document.getElementById(id);
 
     const qs = new URLSearchParams(location.search);
-    let room = (qs.get("room") || "VOICE01").trim();
+    let room = (qs.get("room") || "WELCOME").trim();
 
     const mode = (qs.get("mode") || localStorage.getItem("unline_mode") || "").trim();
     if (mode === "study") document.body.classList.add("mode-study");
