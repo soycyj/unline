@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -10,138 +10,307 @@
       --card:#ffffff;
       --line:#e6eaf2;
       --text:#0b1220;
-      --muted:#55627a;
+      --muted:#5a677f;
       --btn:#2563eb;
-      --btn2:#0f172a;
-      --shadow: 0 12px 40px rgba(15,23,42,0.08);
-      --radius:18px;
+      --shadow: 0 14px 44px rgba(15,23,42,0.10);
+      --radius:20px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
       margin:0;
-      background:radial-gradient(1200px 600px at 20% 10%, #eaf2ff 0%, rgba(234,242,255,0) 60%),
-                 radial-gradient(900px 500px at 80% 0%, #f1ecff 0%, rgba(241,236,255,0) 55%),
-                 var(--bg);
+      background:
+        radial-gradient(1200px 700px at 18% 10%, #eaf2ff 0%, rgba(234,242,255,0) 60%),
+        radial-gradient(900px 520px at 82% 0%, #f1ecff 0%, rgba(241,236,255,0) 55%),
+        var(--bg);
       color:var(--text);
       font-family:system-ui,-apple-system,Segoe UI,Roboto;
       display:flex;
       align-items:center;
       justify-content:center;
-      padding:24px;
+      padding:22px;
     }
     .shell{
-      width:min(860px,100%);
-      background:var(--card);
+      width:min(980px,100%);
+      background:rgba(255,255,255,0.82);
       border:1px solid var(--line);
       border-radius:var(--radius);
       box-shadow:var(--shadow);
-      padding:22px;
-    }
-    .top{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:14px;
-      flex-wrap:wrap;
+      padding:26px;
+      backdrop-filter: blur(12px);
     }
     .brand{
       display:flex;
       flex-direction:column;
-      gap:6px;
+      gap:10px;
+      margin-bottom:18px;
     }
     .logo{
-      font-size:22px;
+      font-size:26px;
       font-weight:950;
       letter-spacing:-0.02em;
     }
-    .tag{
-      color:var(--muted);
-      font-size:13px;
-      line-height:1.45;
+    .hero{
+      font-size:22px;
+      font-weight:950;
+      letter-spacing:-0.02em;
+      line-height:1.25;
     }
-    .panel{
+    .sub{
+      color:var(--muted);
+      font-size:14px;
+      font-weight:800;
+      line-height:1.6;
+      margin-top:4px;
+      white-space:pre-line;
+    }
+    .entry{
+      margin-top:18px;
       display:flex;
       gap:10px;
-      align-items:center;
       flex-wrap:wrap;
-      margin-top:18px;
+      align-items:center;
     }
-    input{
-      width:240px;
-      padding:12px 14px;
-      border-radius:14px;
+    .roomInput{
+      flex:1;
+      min-width:220px;
+      padding:16px 16px;
+      border-radius:16px;
       border:1px solid var(--line);
       background:#fbfcff;
       color:var(--text);
-      font-weight:900;
-      outline:none;
-    }
-    button{
-      padding:12px 14px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:#f2f5fb;
-      color:var(--text);
       font-weight:950;
-      cursor:pointer;
-      box-shadow:0 8px 20px rgba(15,23,42,0.06);
+      font-size:16px;
+      outline:none;
+      box-shadow:0 10px 24px rgba(15,23,42,0.06);
     }
-    button.primary{
+    .btn{
+      padding:16px 16px;
+      border-radius:16px;
+      border:1px solid rgba(37,99,235,0.25);
       background:var(--btn);
-      border-color:rgba(37,99,235,0.35);
       color:#fff;
+      font-weight:950;
+      font-size:16px;
+      cursor:pointer;
+      box-shadow:0 12px 30px rgba(37,99,235,0.25);
+      min-width:140px;
     }
-    .mini{
-      margin-top:14px;
+    .hint{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:13px;
+      font-weight:800;
+    }
+    .modes{
+      margin-top:22px;
+      border-top:1px solid var(--line);
+      padding-top:18px;
+    }
+    .modesTitle{
+      font-size:14px;
+      font-weight:950;
+      letter-spacing:-0.01em;
+      margin:0 0 12px;
+    }
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:12px;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:14px;
+      box-shadow:0 10px 26px rgba(15,23,42,0.06);
+      cursor:pointer;
+      user-select:none;
+      transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+      min-height:120px;
+      position:relative;
+      overflow:hidden;
+    }
+    .card:active{transform:scale(0.99)}
+    .card.selected{
+      border-color: rgba(37,99,235,0.55);
+      box-shadow:0 16px 44px rgba(37,99,235,0.16);
+    }
+    .cardTop{
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:10px;
-      flex-wrap:wrap;
+      margin-bottom:8px;
+    }
+    .cardName{
+      font-weight:950;
+      font-size:14px;
+    }
+    .cardLine{
+      color:var(--muted);
+      font-weight:900;
+      font-size:13px;
+      line-height:1.35;
+    }
+    .cardDesc{
+      color:var(--muted);
+      font-weight:800;
+      font-size:12px;
+      line-height:1.5;
+      margin-top:8px;
+    }
+    .chip{
+      font-size:12px;
+      font-weight:950;
+      color:rgba(11,18,32,0.72);
+      background:#f2f5fb;
+      border:1px solid var(--line);
+      padding:6px 10px;
+      border-radius:999px;
+      white-space:nowrap;
+    }
+    .smallNote{
+      margin-top:10px;
       color:var(--muted);
       font-size:12px;
       font-weight:800;
     }
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 10px;
-      border:1px solid var(--line);
-      border-radius:999px;
-      background:#fbfcff;
+
+    .bgGrid::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background-image:
+        linear-gradient(rgba(37,99,235,0.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(37,99,235,0.10) 1px, transparent 1px);
+      background-size:22px 22px;
+      opacity:0.55;
+      pointer-events:none;
+    }
+    .bgClean::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: radial-gradient(560px 240px at 20% 20%, rgba(37,99,235,0.12) 0%, rgba(37,99,235,0) 70%);
+      opacity:0.9;
+      pointer-events:none;
+    }
+    .bgWarm::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(560px 240px at 20% 20%, rgba(251,191,36,0.22) 0%, rgba(251,191,36,0) 70%),
+        radial-gradient(560px 240px at 80% 40%, rgba(236,72,153,0.16) 0%, rgba(236,72,153,0) 70%);
+      opacity:0.95;
+      pointer-events:none;
+    }
+
+    @media (max-width:980px){
+      .cards{grid-template-columns:1fr}
+      .btn{width:100%}
+      .roomInput{width:100%}
     }
   </style>
 </head>
 <body>
   <div class="shell">
-    <div class="top">
-      <div class="brand">
-        <div class="logo">unline</div>
-        <div class="tag">Create a room and jump in from any device</div>
-      </div>
+    <div class="brand">
+      <div class="logo">unline</div>
+      <div class="hero">말로는 부족할 때, 바로 그려서 보여주세요.</div>
+      <div class="sub">설치 없이, 가입 없이.
+링크 하나로 바로 시작하는 시각적 대화.</div>
     </div>
 
-    <div class="panel">
-      <input id="room" placeholder="Room code" value="VOICE01" />
-      <button class="primary" id="join">Join room</button>
-      <button id="watch">View only</button>
+    <div class="entry">
+      <input id="room" class="roomInput" placeholder="방 이름을 입력하세요" value="VOICE01" />
+      <button id="start" class="btn">시작하기</button>
+    </div>
+    <div class="hint">같은 방 이름으로 접속하면, 목소리와 그림이 바로 이어집니다.</div>
+
+    <div class="modes">
+      <div class="modesTitle">어떤 대화를 원하시나요?</div>
+
+      <div class="cards" id="cards">
+        <div class="card bgGrid" data-mode="study" role="button" tabindex="0" aria-label="공부 모드 선택">
+          <div class="cardTop">
+            <div class="cardName">✏️ 공부 모드</div>
+            <div class="chip">격자</div>
+          </div>
+          <div class="cardLine">개념을 말로 설명하기 어려울 때</div>
+          <div class="cardDesc">언어 연습, 문제 풀이, 개념 정리에 적합합니다.</div>
+        </div>
+
+        <div class="card bgClean" data-mode="meeting" role="button" tabindex="0" aria-label="회의 모드 선택">
+          <div class="cardTop">
+            <div class="cardName">🧩 회의 모드</div>
+            <div class="chip">클린</div>
+          </div>
+          <div class="cardLine">아이디어를 빠르게 공유할 때</div>
+          <div class="cardDesc">짧은 미팅, 기획 스케치, 방향 정리에 적합합니다.</div>
+        </div>
+
+        <div class="card bgWarm" data-mode="free" role="button" tabindex="0" aria-label="자유 모드 선택">
+          <div class="cardTop">
+            <div class="cardName">🎨 자유 모드</div>
+            <div class="chip">웜</div>
+          </div>
+          <div class="cardLine">말하지 않아도 괜찮은 대화</div>
+          <div class="cardDesc">놀이, 상담, 감정 표현에 적합합니다.</div>
+        </div>
+      </div>
+
+      <div class="smallNote">선택하지 않아도 기본 설정으로 시작됩니다.</div>
     </div>
   </div>
 
   <script>
     const $ = (id) => document.getElementById(id);
 
-     function go(label){
-      const room = ($("room").value || "WELCOME").trim();
-      const clientId = "c" + Math.random().toString(16).slice(2,10);
-      location.href = `/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}&label=${encodeURIComponent(label)}`;
+    let selectedMode = localStorage.getItem("unline_mode") || "";
+
+    function applySelected() {
+      const cards = document.querySelectorAll(".card[data-mode]");
+      cards.forEach((c) => {
+        c.classList.toggle("selected", c.dataset.mode === selectedMode);
+      });
     }
 
-    $("join").addEventListener("click", () => go("Member"));
-    $("watch").addEventListener("click", () => go("Guest"));
+    function selectMode(mode) {
+      selectedMode = mode || "";
+      localStorage.setItem("unline_mode", selectedMode);
+      applySelected();
+    }
 
+    document.getElementById("cards").addEventListener("click", (e) => {
+      const card = e.target.closest(".card[data-mode]");
+      if (!card) return;
+      selectMode(card.dataset.mode);
+    });
+
+    document.getElementById("cards").addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const card = e.target.closest(".card[data-mode]");
+      if (!card) return;
+      e.preventDefault();
+      selectMode(card.dataset.mode);
+    });
+
+    function go() {
+      const room = ($("room").value || "VOICE01").trim();
+      const clientId = "c" + Math.random().toString(16).slice(2,10);
+      const label = "Member";
+      const modeParam = selectedMode ? `&mode=${encodeURIComponent(selectedMode)}` : "";
+      location.href = `/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}&label=${encodeURIComponent(label)}${modeParam}`;
+    }
+
+    $("start").addEventListener("click", go);
+    $("room").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") go();
+    });
+
+    applySelected();
   </script>
 </body>
 </html>
