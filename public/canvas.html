@@ -245,18 +245,18 @@
       .wrap{padding-bottom:86px}
     }
 /* =========================
-   MOBILE TOPBAR COMPRESSION
+   MOBILE TOPBAR COMPACT, KEEP ALL CONTROLS
    ========================= */
 @media (max-width: 768px) {
-
   .topbar {
-    padding: 4px 8px;
-    min-height: 44px;
+    padding: 6px 8px;
+    gap: 8px;
   }
 
   .left {
     flex-wrap: nowrap;
     gap: 6px;
+    min-width: 0;
   }
 
   .brand {
@@ -267,18 +267,68 @@
   .roomLine {
     font-size: 11px;
     line-height: 1;
+    max-width: 140px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 160px;
   }
 
-  .desktopTools {
-    display: none !important;
+  /* 모바일에서도 상단 도구는 숨기지 않는다 */
+  .right .desktopTools {
+    display: flex !important;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+
+    /* 여기서 높이가 줄어든다 */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 62vw;
+
+    padding-bottom: 2px;
   }
 
+  /* 스크롤바는 가능하면 안 보이게 */
+  .right .desktopTools::-webkit-scrollbar {
+    height: 0;
+  }
+
+  /* 상단 컨트롤들을 전체적으로 작게 */
+  button {
+    padding: 8px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    box-shadow: none;
+  }
+
+  input {
+    padding: 8px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    box-shadow: none;
+  }
+
+  input#roomInput {
+    width: 120px;
+  }
+
+  input[type="range"] {
+    width: 90px;
+  }
+
+  input[type="color"] {
+    width: 36px;
+    height: 36px;
+    border-radius: 14px;
+  }
+
+  /* 캔버스가 더 위로 올라오도록 여백도 조금만 */
   .wrap {
-    padding-top: 6px;
+    padding: 10px 10px 72px 10px;
+  }
+
+  .stage {
+    min-height: 380px;
   }
 }
   </style>
@@ -352,7 +402,7 @@
     const $ = (id) => document.getElementById(id);
 
     const qs = new URLSearchParams(location.search);
-    let room = (qs.get("room") || "VOICE01").trim();
+    let room = (qs.get("room") || "WELCOME").trim();
 
     const mode = (qs.get("mode") || localStorage.getItem("unline_mode") || "").trim();
     if (mode === "study") document.body.classList.add("mode-study");
