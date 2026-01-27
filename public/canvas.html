@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -14,22 +14,24 @@
       --btn:#2563eb;
       --btn2:#0f172a;
       --danger:#ef4444;
-      --shadow: 0 12px 40px rgba(15,23,42,0.08);
-      --radius:18px;
+      --shadow: 0 14px 44px rgba(15,23,42,0.10);
+      --radius:20px;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{
       margin:0;
-      background:radial-gradient(1200px 600px at 20% 10%, #eaf2ff 0%, rgba(234,242,255,0) 60%),
-                 radial-gradient(900px 500px at 80% 0%, #f1ecff 0%, rgba(241,236,255,0) 55%),
-                 var(--bg);
+      background:
+        radial-gradient(1200px 700px at 18% 10%, #eaf2ff 0%, rgba(234,242,255,0) 60%),
+        radial-gradient(900px 520px at 82% 0%, #f1ecff 0%, rgba(241,236,255,0) 55%),
+        var(--bg);
       color:var(--text);
       font-family:system-ui,-apple-system,Segoe UI,Roboto;
       display:flex;
       flex-direction:column;
       min-height:100%;
     }
+
     .topbar{
       display:flex;
       align-items:center;
@@ -44,6 +46,7 @@
       z-index:20;
     }
     .left,.right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
     .brand{
       display:flex;
       align-items:center;
@@ -51,26 +54,29 @@
       font-weight:950;
       letter-spacing:-0.02em;
     }
-    .brand .sub{
-      font-weight:800;
+    .roomLine{
       color:var(--muted);
-      font-size:12px;
+      font-weight:900;
+      font-size:13px;
+      letter-spacing:-0.01em;
+      white-space:nowrap;
     }
+
     button{
       padding:10px 12px;
       border:1px solid var(--line);
-      border-radius:14px;
+      border-radius:16px;
       cursor:pointer;
       color:var(--text);
       background:#f2f5fb;
       font-weight:950;
       font-size:13px;
-      box-shadow:0 8px 20px rgba(15,23,42,0.06);
+      box-shadow:0 10px 24px rgba(15,23,42,0.06);
       -webkit-tap-highlight-color: transparent;
     }
     button.primary{
       background:var(--btn);
-      border-color:rgba(37,99,235,0.35);
+      border-color:rgba(37,99,235,0.25);
       color:#fff;
     }
     button.danger{
@@ -79,9 +85,10 @@
       color:#b91c1c;
     }
     button:disabled{opacity:0.55;cursor:not-allowed}
+
     input{
       padding:10px 12px;
-      border-radius:14px;
+      border-radius:16px;
       border:1px solid var(--line);
       background:#fbfcff;
       color:var(--text);
@@ -89,12 +96,13 @@
       font-size:13px;
       outline:none;
       width:170px;
+      box-shadow:0 10px 24px rgba(15,23,42,0.06);
     }
     input[type="color"]{
       width:44px;
       height:40px;
       padding:0;
-      border-radius:14px;
+      border-radius:16px;
       border:1px solid var(--line);
       background:#fbfcff;
     }
@@ -137,14 +145,14 @@
       box-shadow:var(--shadow);
       overflow:hidden;
       position:relative;
-      min-height:520px;
+      min-height:560px;
     }
     canvas{
       width:100%;
       height:100%;
       display:block;
       touch-action:none;
-      background:linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+      background:#ffffff;
     }
 
     .userRow{
@@ -159,50 +167,109 @@
       margin-top:10px;
     }
     .badge{
-      width:12px;height:12px;border-radius:5px;border:1px solid var(--line);
+      width:12px;height:12px;border-radius:6px;border:1px solid var(--line);
     }
     .meta{
       font-size:12px;
       color:var(--muted);
       font-weight:800;
-      line-height:1.45;
+      line-height:1.55;
       margin-top:10px;
+      white-space:pre-line;
     }
 
-    /* hide status noise */
+    /* mode visuals only */
+    body.mode-study canvas{
+      background-image:
+        linear-gradient(rgba(37,99,235,0.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(37,99,235,0.10) 1px, transparent 1px);
+      background-size:24px 24px;
+      background-color:#ffffff;
+    }
+    body.mode-meeting canvas{
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+    }
+    body.mode-free canvas{
+      background:
+        radial-gradient(700px 340px at 20% 20%, rgba(251,191,36,0.18) 0%, rgba(251,191,36,0) 70%),
+        radial-gradient(700px 340px at 80% 30%, rgba(236,72,153,0.14) 0%, rgba(236,72,153,0) 70%),
+        #ffffff;
+    }
+
+    /* hide debug UI without removing logic */
     #connStatus, #wsTxt, #rtcTxt, #voiceState, #dbg { display:none; }
+
+    /* mobile floating controls */
+    .fabBar{
+      display:none;
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:14px;
+      z-index:50;
+      background:rgba(255,255,255,0.86);
+      border:1px solid var(--line);
+      border-radius:999px;
+      box-shadow:0 18px 50px rgba(15,23,42,0.18);
+      padding:10px;
+      gap:10px;
+      align-items:center;
+      backdrop-filter: blur(10px);
+    }
+    .fabBtn{
+      width:52px;
+      height:52px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:#f2f5fb;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:20px;
+      font-weight:950;
+      cursor:pointer;
+      box-shadow:0 10px 24px rgba(15,23,42,0.10);
+    }
+    .fabBtn.on{
+      background:var(--btn);
+      border-color:rgba(37,99,235,0.25);
+      color:#fff;
+    }
 
     @media (max-width:1060px){
       .wrap{grid-template-columns:1fr}
       .stage{min-height:520px}
       input[type="range"]{width:120px}
+      .fabBar{display:flex}
+      .right .desktopTools{display:none}
+      .wrap{padding-bottom:86px}
     }
   </style>
 </head>
 <body>
   <div class="topbar">
     <div class="left">
-      <div class="brand">
-        <span>unline</span>
-        <span class="sub" id="roomTxt"></span>
-      </div>
+      <div class="brand">unline</div>
+      <div class="roomLine" id="roomLine">Room</div>
     </div>
 
     <div class="right">
-      <button id="homeBtn">Home</button>
+      <div class="desktopTools" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button id="homeBtn">Home</button>
 
-      <button id="penBtn" class="primary">Pen</button>
-      <button id="eraserBtn">Eraser</button>
+        <button id="penBtn" class="primary">Pen</button>
+        <button id="eraserBtn">Eraser</button>
 
-      <input id="colorInput" type="color" value="#111827" />
-      <div style="display:flex;align-items:center;gap:10px">
-        <input id="widthInput" type="range" min="1" max="18" value="3" />
-        <span id="widthTxt" style="font-weight:950;color:var(--muted)">3</span>
+        <input id="colorInput" type="color" value="#111827" />
+        <div style="display:flex;align-items:center;gap:10px">
+          <input id="widthInput" type="range" min="1" max="18" value="3" />
+          <span id="widthTxt" style="font-weight:950;color:var(--muted)">3</span>
+        </div>
+
+        <input id="roomInput" placeholder="Room" />
+        <button id="goRoomBtn">Go</button>
+        <button id="clearBtn" class="danger">Clear</button>
       </div>
-
-      <input id="roomInput" placeholder="Room" />
-      <button id="goRoomBtn">Go</button>
-      <button id="clearBtn" class="danger">Clear</button>
     </div>
   </div>
 
@@ -223,6 +290,8 @@
           <button id="stopVoiceBtn" class="danger" disabled>Stop</button>
         </div>
         <audio id="remoteAudio" autoplay playsinline></audio>
+        <div id="voiceState">Idle</div>
+        <div id="dbg"></div>
       </div>
     </div>
 
@@ -231,13 +300,27 @@
     </div>
   </div>
 
+  <!-- mobile floating controls -->
+  <div class="fabBar" aria-label="mobile controls">
+    <div class="fabBtn" id="fabMic" title="Voice">🎤</div>
+    <div class="fabBtn on" id="fabPen" title="Pen">✏️</div>
+    <div class="fabBtn" id="fabEraser" title="Eraser">🧽</div>
+  </div>
+
+  <div id="connStatus">Offline</div>
+  <div id="wsTxt">offline</div>
+  <div id="rtcTxt">idle</div>
+
   <script>
     const $ = (id) => document.getElementById(id);
 
     const qs = new URLSearchParams(location.search);
     let room = (qs.get("room") || "VOICE01").trim();
-    $("roomTxt").textContent = "Room " + room;
-    $("roomInput").value = room;
+
+    const mode = (qs.get("mode") || localStorage.getItem("unline_mode") || "").trim();
+    if (mode === "study") document.body.classList.add("mode-study");
+    if (mode === "meeting") document.body.classList.add("mode-meeting");
+    if (mode === "free") document.body.classList.add("mode-free");
 
     let clientId = (qs.get("clientId") || "").trim();
     if (!clientId) {
@@ -248,6 +331,8 @@
 
     const label = (qs.get("label") || "").trim();
 
+    $("roomInput").value = room;
+
     const toolKey = "unline_tool";
     const colorKey = "unline_penColor";
     const widthKey = "unline_penWidth";
@@ -256,10 +341,10 @@
     let penColor = localStorage.getItem(colorKey) || "#111827";
     let penWidth = Number(localStorage.getItem(widthKey) || 3);
 
-    function dbg(t){ const el = $("dbg"); if (el) el.textContent = t || ""; }
-    function setConn(online){ const el = $("connStatus"); if (!el) return; el.textContent = online ? "Online" : "Offline"; }
-    function setWsState(t){ const el = $("wsTxt"); if (el) el.textContent = t || "offline"; }
-    function setRtcState(t){ const el = $("rtcTxt"); if (el) el.textContent = t || "idle"; }
+    function dbg(t){ $("dbg").textContent = t || ""; }
+    function setConn(online){ $("connStatus").textContent = online ? "Online" : "Offline"; }
+    function setWsState(t){ $("wsTxt").textContent = t || "offline"; }
+    function setRtcState(t){ $("rtcTxt").textContent = t || "idle"; }
 
     function syncToolUi(){
       $("penBtn").classList.toggle("primary", toolMode === "pen");
@@ -268,6 +353,9 @@
       $("widthInput").value = String(penWidth);
       $("widthTxt").textContent = String(penWidth);
       $("colorInput").value = penColor;
+
+      $("fabPen").classList.toggle("on", toolMode === "pen");
+      $("fabEraser").classList.toggle("on", toolMode === "eraser");
     }
 
     $("homeBtn").addEventListener("click", () => { location.href = "/"; });
@@ -357,6 +445,11 @@
       }
     }
 
+    function updateRoomLine() {
+      const peopleText = `${visitors} people`;
+      $("roomLine").textContent = `Room ${room} · ${peopleText}`;
+    }
+
     function updateUi() {
       $("clearBtn").disabled = !canDraw();
       $("startVoiceBtn").disabled = !canVoice() || callActive;
@@ -365,10 +458,11 @@
       $("manageBox").style.display = meRole === "participant" ? "block" : "none";
       if (meRole === "participant") renderUserList();
 
+      updateRoomLine();
+
       const hint = [];
-      hint.push("Invite a friend with the same room code");
-      hint.push("Voice and live drawing work when both are participants");
-      hint.push("Visitors " + String(visitors));
+      hint.push("같은 방 이름으로 접속하면 바로 연결됩니다.");
+      hint.push("음성과 그림은 participant에서 사용됩니다.");
       $("hintTxt").textContent = hint.join("\n");
     }
 
@@ -424,8 +518,6 @@
       const nextRoom = ($("roomInput").value || "").trim();
       if (!nextRoom) return;
       room = nextRoom;
-      $("roomTxt").textContent = "Room " + room;
-
       if (ws) { try { ws.close(); } catch {} }
       clearCanvas(false);
       connect();
@@ -545,8 +637,7 @@
     let callActive = false;
 
     function setVoiceState(t) {
-      const el = $("voiceState");
-      if (el) el.textContent = t || "Idle";
+      $("voiceState").textContent = t || "Idle";
       setRtcState(t || "idle");
       updateUi();
     }
@@ -615,7 +706,7 @@
       if (!canVoice()) { send("voice_reject", { reason: "not_allowed" }); return; }
       if (callActive) { send("voice_reject", { reason: "busy" }); return; }
 
-      const ok = confirm("Join voice call");
+      const ok = confirm("보이스 대화에 참여할까요?");
       if (!ok) { send("voice_reject", { reason: "rejected" }); return; }
 
       unlockAudioNoWait();
@@ -682,11 +773,32 @@
       teardownVoice("Peer stopped");
     }
 
+    /* mobile floating controls map to existing buttons */
+    $("fabPen").addEventListener("click", () => $("penBtn").click());
+    $("fabEraser").addEventListener("click", () => $("eraserBtn").click());
+
+    function refreshMicFab() {
+      $("fabMic").classList.toggle("on", callActive);
+    }
+
+    const origSetVoiceState = setVoiceState;
+    setVoiceState = function(t){
+      origSetVoiceState(t);
+      refreshMicFab();
+    };
+
+    $("fabMic").addEventListener("click", () => {
+      if (callActive) $("stopVoiceBtn").click();
+      else $("startVoiceBtn").click();
+      refreshMicFab();
+    });
+
     async function boot() {
       syncToolUi();
       await loadIceServers();
       connect();
       updateUi();
+      refreshMicFab();
     }
 
     boot();
