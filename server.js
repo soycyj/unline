@@ -134,23 +134,16 @@ wss.on("connection", (ws, req) => {
 
   const r = getRoom(room);
 
-  /* participant auto assign teacher student first two */
-  const isTeacher = label.toLowerCase() === "teacher";
-  const isStudent = label.toLowerCase() === "student";
+  /* 제한 제거: Guest만 viewer, 그 외는 participant */
+  const isGuest = label.toLowerCase() === "guest" || label.toLowerCase() === "viewer";
+  const role = isGuest ? "viewer" : "participant";
 
-  let role = "viewer";
-  if ((isTeacher || isStudent) && r.participants.size < 2) {
-    role = "participant";
-    r.participants.add(clientId);
-  } else if (r.participants.size < 2 && !r.participants.has(clientId)) {
-    role = "participant";
-    r.participants.add(clientId);
-  }
+  if (role === "participant") r.participants.add(clientId);
 
   const user = {
     ws,
     clientId,
-    label: label || "User",
+    label: label || "Member",
     role,
     ready: false,
     color: `hsl(${Math.floor(Math.random() * 360)},70%,60%)`,
@@ -220,8 +213,8 @@ wss.on("connection", (ws, req) => {
       const target = r.users.get(targetId);
       if (!target) return;
 
+      /* 제한 제거: participant 무제한 */
       if (nextRole === "participant") {
-        if (r.participants.size >= 2 && !r.participants.has(targetId)) return;
         r.participants.add(targetId);
         target.role = "participant";
       } else {
@@ -249,6 +242,7 @@ wss.on("connection", (ws, req) => {
 
       const payload = { ...msg, fromClientId: clientId };
 
+      /* participant 전체에게 릴레이 */
       for (const u of r.users.values()) {
         if (u.clientId === clientId) continue;
         if (u.role !== "participant") continue;
