@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -199,6 +199,39 @@
     /* hide debug UI without removing logic */
     #connStatus, #wsTxt, #rtcTxt, #voiceState, #dbg { display:none; }
 
+    /* language switch */
+    .langSwitch{
+      display:inline-flex;
+      align-items:center;
+      border:1px solid var(--line);
+      border-radius:16px;
+      overflow:hidden;
+      background:#fbfcff;
+      box-shadow:0 10px 24px rgba(15,23,42,0.06);
+      flex:0 0 auto;
+    }
+    .langBtn{
+      appearance:none;
+      border:0;
+      background:transparent;
+      color:rgba(11,18,32,0.65);
+      padding:10px 10px;
+      width:44px;
+      min-width:44px;
+      text-align:center;
+      font-weight:950;
+      font-size:12px;
+      line-height:1;
+      cursor:pointer;
+      user-select:none;
+      box-shadow:none;
+      border-radius:0;
+    }
+    .langBtn.isActive{
+      background:rgba(37,99,235,0.10);
+      color:rgba(11,18,32,0.95);
+    }
+
     /* mobile floating controls */
     .fabBar{
       display:none;
@@ -244,93 +277,92 @@
       .right .desktopTools{display:none}
       .wrap{padding-bottom:86px}
     }
-/* =========================
-   MOBILE TOPBAR COMPACT, KEEP ALL CONTROLS
-   ========================= */
-@media (max-width: 768px) {
-  .topbar {
-    padding: 6px 8px;
-    gap: 8px;
-  }
 
-  .left {
-    flex-wrap: nowrap;
-    gap: 6px;
-    min-width: 0;
-  }
+    /* MOBILE TOPBAR COMPACT, KEEP ALL CONTROLS */
+    @media (max-width: 768px) {
+      .topbar {
+        padding: 6px 8px;
+        gap: 8px;
+      }
 
-  .brand {
-    font-size: 14px;
-    line-height: 1;
-  }
+      .left {
+        flex-wrap: nowrap;
+        gap: 6px;
+        min-width: 0;
+      }
 
-  .roomLine {
-    font-size: 11px;
-    line-height: 1;
-    max-width: 140px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+      .brand {
+        font-size: 14px;
+        line-height: 1;
+      }
 
-  /* 모바일에서도 상단 도구는 숨기지 않는다 */
-  .right .desktopTools {
-    display: flex !important;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 8px;
+      .roomLine {
+        font-size: 11px;
+        line-height: 1;
+        max-width: 140px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
 
-    /* 여기서 높이가 줄어든다 */
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    max-width: 62vw;
+      .right .desktopTools {
+        display: flex !important;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 62vw;
+        padding-bottom: 2px;
+      }
 
-    padding-bottom: 2px;
-  }
+      .right .desktopTools::-webkit-scrollbar {
+        height: 0;
+      }
 
-  /* 스크롤바는 가능하면 안 보이게 */
-  .right .desktopTools::-webkit-scrollbar {
-    height: 0;
-  }
+      button {
+        padding: 8px 10px;
+        border-radius: 14px;
+        font-size: 12px;
+        box-shadow: none;
+      }
 
-  /* 상단 컨트롤들을 전체적으로 작게 */
-  button {
-    padding: 8px 10px;
-    border-radius: 14px;
-    font-size: 12px;
-    box-shadow: none;
-  }
+      input {
+        padding: 8px 10px;
+        border-radius: 14px;
+        font-size: 12px;
+        box-shadow: none;
+      }
 
-  input {
-    padding: 8px 10px;
-    border-radius: 14px;
-    font-size: 12px;
-    box-shadow: none;
-  }
+      input#roomInput {
+        width: 120px;
+      }
 
-  input#roomInput {
-    width: 120px;
-  }
+      input[type="range"] {
+        width: 90px;
+      }
 
-  input[type="range"] {
-    width: 90px;
-  }
+      input[type="color"] {
+        width: 36px;
+        height: 36px;
+        border-radius: 14px;
+      }
 
-  input[type="color"] {
-    width: 36px;
-    height: 36px;
-    border-radius: 14px;
-  }
+      .langBtn{
+        padding:8px 8px;
+        width:40px;
+        min-width:40px;
+        font-size:12px;
+      }
 
-  /* 캔버스가 더 위로 올라오도록 여백도 조금만 */
-  .wrap {
-    padding: 10px 10px 72px 10px;
-  }
+      .wrap {
+        padding: 10px 10px 72px 10px;
+      }
 
-  .stage {
-    min-height: 380px;
-  }
-}
+      .stage {
+        min-height: 380px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -342,6 +374,12 @@
 
     <div class="right">
       <div class="desktopTools" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div class="langSwitch" role="group" aria-label="Language">
+          <button type="button" class="langBtn" data-lang="en" aria-pressed="false">EN</button>
+          <button type="button" class="langBtn" data-lang="ko" aria-pressed="false">KR</button>
+          <button type="button" class="langBtn" data-lang="ja" aria-pressed="false">JP</button>
+        </div>
+
         <button id="homeBtn">Home</button>
 
         <button id="penBtn" class="primary">Pen</button>
@@ -363,7 +401,7 @@
   <div class="wrap">
     <div class="col">
       <div class="card">
-        <h3>People</h3>
+        <h3 id="peopleTitle">People</h3>
         <div id="manageBox" style="display:none">
           <div id="userList"></div>
         </div>
@@ -371,7 +409,7 @@
       </div>
 
       <div class="card">
-        <h3>Voice</h3>
+        <h3 id="voiceTitle">Voice</h3>
         <div class="row">
           <button id="startVoiceBtn" class="primary">Start voice</button>
           <button id="stopVoiceBtn" class="danger" disabled>Stop</button>
@@ -388,7 +426,7 @@
   </div>
 
   <!-- mobile floating controls -->
-  <div class="fabBar" aria-label="mobile controls">
+  <div class="fabBar" id="fabBar" aria-label="mobile controls">
     <div class="fabBtn" id="fabMic" title="Voice">🎤</div>
     <div class="fabBtn on" id="fabPen" title="Pen">✏️</div>
     <div class="fabBtn" id="fabEraser" title="Eraser">🧽</div>
@@ -401,6 +439,178 @@
   <script>
     const $ = (id) => document.getElementById(id);
 
+    /* =========================
+       i18n
+       ========================= */
+    const LANG_KEY = "unline_lang";
+    const SUPPORTED = new Set(["en","ko","ja"]);
+    let currentLang = "en";
+
+    const I18N = {
+      en: {
+        home: "Home",
+        pen: "Pen",
+        eraser: "Eraser",
+        roomPlaceholder: "Room",
+        go: "Go",
+        clear: "Clear",
+        peopleTitle: "People",
+        voiceTitle: "Voice",
+        startVoice: "Start voice",
+        stop: "Stop",
+        you: "You",
+        member: "Member",
+        roomPrefix: "Room",
+        peopleSuffix: "people",
+        hint1: "Join the same room to connect instantly.",
+        hint2: "Voice and drawing work in participant mode.",
+        confirmJoinVoice: "Join the voice chat?",
+        notAllowed: "Not allowed",
+        requesting: "Requesting",
+        accepted: "Accepted",
+        connecting: "Connecting",
+        connected: "Connected",
+        rejected: "Rejected",
+        stopped: "Stopped",
+        peerStopped: "Peer stopped",
+        voiceError: "Voice error",
+        fabMicTitle: "Voice",
+        fabPenTitle: "Pen",
+        fabEraserTitle: "Eraser",
+        mobileControlsAria: "mobile controls"
+      },
+      ko: {
+        home: "홈",
+        pen: "펜",
+        eraser: "지우개",
+        roomPlaceholder: "방 코드",
+        go: "이동",
+        clear: "지우기",
+        peopleTitle: "사람",
+        voiceTitle: "음성",
+        startVoice: "음성 시작",
+        stop: "중지",
+        you: "나",
+        member: "멤버",
+        roomPrefix: "방",
+        peopleSuffix: "명",
+        hint1: "같은 방 이름으로 접속하면 바로 연결됩니다.",
+        hint2: "음성과 그림은 participant에서 사용됩니다.",
+        confirmJoinVoice: "보이스 대화에 참여할까요?",
+        notAllowed: "권한 없음",
+        requesting: "요청 중",
+        accepted: "수락됨",
+        connecting: "연결 중",
+        connected: "연결됨",
+        rejected: "거절됨",
+        stopped: "중지됨",
+        peerStopped: "상대가 종료함",
+        voiceError: "음성 오류",
+        fabMicTitle: "음성",
+        fabPenTitle: "펜",
+        fabEraserTitle: "지우개",
+        mobileControlsAria: "모바일 컨트롤"
+      },
+      ja: {
+        home: "ホーム",
+        pen: "ペン",
+        eraser: "消しゴム",
+        roomPlaceholder: "ルームコード",
+        go: "移動",
+        clear: "クリア",
+        peopleTitle: "参加者",
+        voiceTitle: "音声",
+        startVoice: "音声開始",
+        stop: "停止",
+        you: "自分",
+        member: "メンバー",
+        roomPrefix: "ルーム",
+        peopleSuffix: "人",
+        hint1: "同じルーム名で入るとすぐ接続されます。",
+        hint2: "音声と描画は participant で利用できます。",
+        confirmJoinVoice: "音声チャットに参加しますか？",
+        notAllowed: "許可なし",
+        requesting: "リクエスト中",
+        accepted: "承認",
+        connecting: "接続中",
+        connected: "接続完了",
+        rejected: "拒否",
+        stopped: "停止",
+        peerStopped: "相手が終了",
+        voiceError: "音声エラー",
+        fabMicTitle: "音声",
+        fabPenTitle: "ペン",
+        fabEraserTitle: "消しゴム",
+        mobileControlsAria: "モバイル操作"
+      }
+    };
+
+    function getStoredLang() {
+      const v = localStorage.getItem(LANG_KEY);
+      if (v && SUPPORTED.has(v)) return v;
+      return "en";
+    }
+
+    function setStoredLang(lang) {
+      localStorage.setItem(LANG_KEY, lang);
+    }
+
+    function t(key) {
+      const dict = I18N[currentLang] || I18N.en;
+      return dict[key] ?? (I18N.en[key] ?? "");
+    }
+
+    function applyLang(lang) {
+      currentLang = SUPPORTED.has(lang) ? lang : "en";
+      setStoredLang(currentLang);
+      document.documentElement.lang = currentLang;
+
+      if ($("homeBtn")) $("homeBtn").textContent = t("home");
+      if ($("penBtn")) $("penBtn").textContent = t("pen");
+      if ($("eraserBtn")) $("eraserBtn").textContent = t("eraser");
+      if ($("roomInput")) $("roomInput").placeholder = t("roomPlaceholder");
+      if ($("goRoomBtn")) $("goRoomBtn").textContent = t("go");
+      if ($("clearBtn")) $("clearBtn").textContent = t("clear");
+      if ($("peopleTitle")) $("peopleTitle").textContent = t("peopleTitle");
+      if ($("voiceTitle")) $("voiceTitle").textContent = t("voiceTitle");
+      if ($("startVoiceBtn")) $("startVoiceBtn").textContent = t("startVoice");
+      if ($("stopVoiceBtn")) $("stopVoiceBtn").textContent = t("stop");
+
+      const fabBar = $("fabBar");
+      if (fabBar) fabBar.setAttribute("aria-label", t("mobileControlsAria"));
+
+      const fabMic = $("fabMic");
+      const fabPen = $("fabPen");
+      const fabEraser = $("fabEraser");
+      if (fabMic) fabMic.title = t("fabMicTitle");
+      if (fabPen) fabPen.title = t("fabPenTitle");
+      if (fabEraser) fabEraser.title = t("fabEraserTitle");
+
+      document.querySelectorAll(".langBtn").forEach(btn => {
+        const isActive = btn.dataset.lang === currentLang;
+        btn.classList.toggle("isActive", isActive);
+        btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+      });
+
+      updateUi();
+    }
+
+    function initI18nUi() {
+      const initial = getStoredLang();
+      applyLang(initial);
+
+      document.querySelectorAll(".langBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const lang = btn.dataset.lang;
+          if (!SUPPORTED.has(lang)) return;
+          applyLang(lang);
+        });
+      });
+    }
+
+    /* =========================
+       existing app logic
+       ========================= */
     const qs = new URLSearchParams(location.search);
     let room = (qs.get("room") || "WELCOME").trim();
 
@@ -511,7 +721,7 @@
         txt.style.fontSize = "13px";
         txt.style.fontWeight = "950";
         txt.style.color = "var(--text)";
-        txt.textContent = u.clientId === clientId ? "You" : (u.label || "Member");
+        txt.textContent = u.clientId === clientId ? t("you") : (u.label || t("member"));
 
         left.appendChild(badge);
         left.appendChild(txt);
@@ -533,8 +743,8 @@
     }
 
     function updateRoomLine() {
-      const peopleText = `${visitors} people`;
-      $("roomLine").textContent = `Room ${room} · ${peopleText}`;
+      const peopleText = `${visitors} ${t("peopleSuffix")}`;
+      $("roomLine").textContent = `${t("roomPrefix")} ${room} · ${peopleText}`;
     }
 
     function updateUi() {
@@ -548,8 +758,8 @@
       updateRoomLine();
 
       const hint = [];
-      hint.push("같은 방 이름으로 접속하면 바로 연결됩니다.");
-      hint.push("음성과 그림은 participant에서 사용됩니다.");
+      hint.push(t("hint1"));
+      hint.push(t("hint2"));
       $("hintTxt").textContent = hint.join("\n");
     }
 
@@ -569,326 +779,4 @@
       });
 
       ws.addEventListener("message", (evt) => {
-        let msg;
-        try { msg = JSON.parse(evt.data); } catch { return; }
-
-        if (msg.type === "room_state") {
-          visitors = msg.visitors ?? visitors;
-          users = msg.users ?? users;
-
-          const me = users.find(x => x.clientId === clientId);
-          if (me && me.role) meRole = me.role;
-
-          updateUi();
-          return;
-        }
-
-        if (msg.type === "canvas_snapshot") {
-          applySnapshot(msg.strokes || []);
-          return;
-        }
-
-        if (msg.type === "draw") { drawStroke(msg); return; }
-        if (msg.type === "clear") { clearCanvas(false); return; }
-
-        if (msg.type === "voice_request") return onVoiceRequest(msg);
-        if (msg.type === "voice_accept") return onVoiceAccept(msg);
-        if (msg.type === "voice_reject") return onVoiceReject(msg);
-        if (msg.type === "voice_offer") return onVoiceOffer(msg);
-        if (msg.type === "voice_answer") return onVoiceAnswer(msg);
-        if (msg.type === "voice_ice") return onVoiceIce(msg);
-        if (msg.type === "voice_stop") return onVoiceStop(msg);
-      });
-    }
-
-    $("goRoomBtn").addEventListener("click", () => {
-      const nextRoom = ($("roomInput").value || "").trim();
-      if (!nextRoom) return;
-      room = nextRoom;
-      if (ws) { try { ws.close(); } catch {} }
-      clearCanvas(false);
-      connect();
-    });
-
-    const canvas = $("board");
-    const ctx = canvas.getContext("2d");
-
-    function resize(){
-      const rect = canvas.getBoundingClientRect();
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      canvas.width = Math.floor(rect.width * dpr);
-      canvas.height = Math.floor(rect.height * dpr);
-      ctx.setTransform(dpr,0,0,dpr,0,0);
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-    }
-    window.addEventListener("resize", resize);
-    resize();
-
-    function clearCanvas(broadcast) {
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      if (broadcast) send("clear", {});
-    }
-
-    $("clearBtn").addEventListener("click", () => {
-      if (!canDraw()) return;
-      clearCanvas(true);
-    });
-
-    function drawStroke(s) {
-      const a = s.a, b = s.b;
-      const mode = s.mode || "pen";
-      const w = Number(s.w || 3);
-      const color = s.color || "#111827";
-
-      const prev = ctx.globalCompositeOperation;
-      if (mode === "eraser") {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.strokeStyle = "rgba(0,0,0,1)";
-      } else {
-        ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = color;
-      }
-
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-
-      ctx.globalCompositeOperation = prev;
-    }
-
-    function applySnapshot(strokes) {
-      clearCanvas(false);
-      for (const s of strokes) drawStroke(s);
-    }
-
-    function posFromEvent(e){
-      const rect = canvas.getBoundingClientRect();
-      return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
-    }
-
-    let drawing = false;
-    let last = null;
-
-    canvas.addEventListener("pointerdown", (e) => {
-      if (!canDraw()) return;
-      drawing = true;
-      last = posFromEvent(e);
-      canvas.setPointerCapture(e.pointerId);
-    });
-
-    canvas.addEventListener("pointermove", (e) => {
-      if (!drawing) return;
-      const p = posFromEvent(e);
-
-      const stroke = { a: last, b: p, mode: toolMode, color: penColor, w: penWidth };
-      drawStroke(stroke);
-      send("draw", stroke);
-      last = p;
-    });
-
-    canvas.addEventListener("pointerup", () => { drawing = false; last = null; });
-    canvas.addEventListener("pointercancel", () => { drawing = false; last = null; });
-
-    let iceServers = [{ urls: ["stun:stun.l.google.com:19302"] }];
-
-    async function loadIceServers() {
-      try {
-        const r = await fetch("/api/ice", { cache: "no-store" });
-        const j = await r.json();
-        if (j && j.ok && Array.isArray(j.iceServers) && j.iceServers.length) {
-          iceServers = j.iceServers;
-        }
-      } catch {}
-    }
-
-    let audioCtx = null;
-    async function unlockAudioNoWait() {
-      try {
-        const a = $("remoteAudio");
-        try { a.muted = false; } catch {}
-        try { await a.play(); } catch {}
-
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (Ctx && !audioCtx) audioCtx = new Ctx();
-        if (audioCtx && audioCtx.state === "suspended") {
-          try { await audioCtx.resume(); } catch {}
-        }
-      } catch {}
-    }
-
-    let pc = null;
-    let localStream = null;
-    let callActive = false;
-
-    function setVoiceState(t) {
-      $("voiceState").textContent = t || "Idle";
-      setRtcState(t || "idle");
-      updateUi();
-    }
-
-    async function ensureLocalAudio() {
-      if (localStream) return localStream;
-      localStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true },
-        video: false
-      });
-      return localStream;
-    }
-
-    async function createPeer() {
-      pc = new RTCPeerConnection({ iceServers });
-
-      pc.onicecandidate = (e) => {
-        if (e.candidate) send("voice_ice", { candidate: e.candidate });
-      };
-
-      pc.ontrack = async (e) => {
-        const stream = e.streams && e.streams[0];
-        if (!stream) return;
-        const a = $("remoteAudio");
-        a.srcObject = stream;
-        try { await a.play(); } catch {}
-      };
-
-      const s = await ensureLocalAudio();
-      s.getTracks().forEach(t => pc.addTrack(t, s));
-    }
-
-    function teardownVoice(state) {
-      try { if (pc) pc.close(); } catch {}
-      pc = null;
-
-      try { if (localStream) localStream.getTracks().forEach(t => t.stop()); } catch {}
-      localStream = null;
-
-      callActive = false;
-      setVoiceState(state || "Idle");
-      dbg("");
-    }
-
-    $("startVoiceBtn").addEventListener("click", async () => {
-      if (!canVoice()) return;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      if (callActive) return;
-
-      setVoiceState("Requesting");
-      unlockAudioNoWait();
-
-      try { await ensureLocalAudio(); }
-      catch { setVoiceState("Idle"); return; }
-
-      send("voice_request", {});
-    });
-
-    $("stopVoiceBtn").addEventListener("click", () => {
-      if (!callActive) return;
-      send("voice_stop", {});
-      teardownVoice("Stopped");
-    });
-
-    function onVoiceRequest() {
-      if (!canVoice()) { send("voice_reject", { reason: "not_allowed" }); return; }
-      if (callActive) { send("voice_reject", { reason: "busy" }); return; }
-
-      const ok = confirm("보이스 대화에 참여할까요?");
-      if (!ok) { send("voice_reject", { reason: "rejected" }); return; }
-
-      unlockAudioNoWait();
-      send("voice_accept", {});
-      setVoiceState("Accepted");
-    }
-
-    async function onVoiceAccept() {
-      try {
-        callActive = true;
-        setVoiceState("Connecting");
-
-        await createPeer();
-
-        const offer = await pc.createOffer({ offerToReceiveAudio: true });
-        await pc.setLocalDescription(offer);
-
-        send("voice_offer", { sdp: offer });
-        setVoiceState("Connecting");
-      } catch {
-        teardownVoice("Voice error");
-      }
-    }
-
-    function onVoiceReject() {
-      callActive = false;
-      setVoiceState("Rejected");
-    }
-
-    async function onVoiceOffer(msg) {
-      try {
-        callActive = true;
-        setVoiceState("Connecting");
-
-        await createPeer();
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        send("voice_answer", { sdp: answer });
-        setVoiceState("Connecting");
-      } catch {
-        teardownVoice("Voice error");
-      }
-    }
-
-    async function onVoiceAnswer(msg) {
-      if (!pc) return;
-      try {
-        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-        setVoiceState("Connected");
-      } catch {
-        teardownVoice("Voice error");
-      }
-    }
-
-    async function onVoiceIce(msg) {
-      if (!pc || !msg || !msg.candidate) return;
-      try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
-    }
-
-    function onVoiceStop() {
-      teardownVoice("Peer stopped");
-    }
-
-    /* mobile floating controls map to existing buttons */
-    $("fabPen").addEventListener("click", () => $("penBtn").click());
-    $("fabEraser").addEventListener("click", () => $("eraserBtn").click());
-
-    function refreshMicFab() {
-      $("fabMic").classList.toggle("on", callActive);
-    }
-
-    const origSetVoiceState = setVoiceState;
-    setVoiceState = function(t){
-      origSetVoiceState(t);
-      refreshMicFab();
-    };
-
-    $("fabMic").addEventListener("click", () => {
-      if (callActive) $("stopVoiceBtn").click();
-      else $("startVoiceBtn").click();
-      refreshMicFab();
-    });
-
-    async function boot() {
-      syncToolUi();
-      await loadIceServers();
-      connect();
-      updateUi();
-      refreshMicFab();
-    }
-
-    boot();
-  </script>
-</body>
-</html>
+        let
