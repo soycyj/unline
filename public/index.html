@@ -1,35 +1,138 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Unline Voice Test</title>
+  <title>unline</title>
   <style>
-    :root{--bg:#0b0d10;--panel:rgba(20,24,33,0.92);--line:rgba(39,48,68,0.9);--text:#e8eef9;--muted:#a9b4c7;--btn:#1f6feb;--btn2:#2b3242}
-    *{box-sizing:border-box} html,body{height:100%}
-    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto;display:flex;align-items:center;justify-content:center;padding:18px}
-    .card{width:min(760px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px}
-    h1{margin:0 0 8px;font-size:18px}
-    .sub{margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    input{padding:12px;border-radius:12px;border:1px solid var(--line);background:rgba(10,12,16,0.55);color:var(--text);font-weight:900;width:220px;outline:none}
-    button{padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--btn2);color:var(--text);font-weight:900;cursor:pointer}
-    button.primary{background:var(--btn);border-color:rgba(31,111,235,0.75)}
-    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:900;margin-top:10px}
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --line:#e6eaf2;
+      --text:#0b1220;
+      --muted:#55627a;
+      --btn:#2563eb;
+      --btn2:#0f172a;
+      --shadow: 0 12px 40px rgba(15,23,42,0.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:radial-gradient(1200px 600px at 20% 10%, #eaf2ff 0%, rgba(234,242,255,0) 60%),
+                 radial-gradient(900px 500px at 80% 0%, #f1ecff 0%, rgba(241,236,255,0) 55%),
+                 var(--bg);
+      color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    .shell{
+      width:min(860px,100%);
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:22px;
+    }
+    .top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .logo{
+      font-size:22px;
+      font-weight:950;
+      letter-spacing:-0.02em;
+    }
+    .tag{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.45;
+    }
+    .panel{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top:18px;
+    }
+    input{
+      width:240px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:#fbfcff;
+      color:var(--text);
+      font-weight:900;
+      outline:none;
+    }
+    button{
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:#f2f5fb;
+      color:var(--text);
+      font-weight:950;
+      cursor:pointer;
+      box-shadow:0 8px 20px rgba(15,23,42,0.06);
+    }
+    button.primary{
+      background:var(--btn);
+      border-color:rgba(37,99,235,0.35);
+      color:#fff;
+    }
+    .mini{
+      margin-top:14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:12px;
+      font-weight:800;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      background:#fbfcff;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Unline Voice Test</h1>
-    <p class="sub">PC에서 Teacher enter, 모바일에서 Student enter, 두 화면에서 Start voice 테스트</p>
-
-    <div class="row">
-      <input id="room" placeholder="room code" value="VOICE01" />
-      <button class="primary" id="teacher">Teacher enter</button>
-      <button class="primary" id="student">Student enter</button>
+  <div class="shell">
+    <div class="top">
+      <div class="brand">
+        <div class="logo">unline</div>
+        <div class="tag">Create a room and jump in from any device</div>
+      </div>
     </div>
 
-    <div class="pill">BUILD <strong id="buildTxt">loading</strong></div>
+    <div class="panel">
+      <input id="room" placeholder="Room code" value="VOICE01" />
+      <button class="primary" id="join">Join room</button>
+      <button id="watch">View only</button>
+    </div>
+
+    <div class="mini">
+      <div class="pill">Build <strong id="buildTxt" style="color:var(--text)">loading</strong></div>
+      <div>Tip open the same room on another device for voice and live drawing</div>
+    </div>
   </div>
 
   <script>
@@ -47,12 +150,12 @@
 
     function go(label){
       const room = ($("room").value || "VOICE01").trim();
-      const clientId = (label === "Teacher" ? "t" : "s") + Math.random().toString(16).slice(2,10);
+      const clientId = "c" + Math.random().toString(16).slice(2,10);
       location.href = `/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}&label=${encodeURIComponent(label)}`;
     }
 
-    $("teacher").addEventListener("click", () => go("Teacher"));
-    $("student").addEventListener("click", () => go("Student"));
+    $("join").addEventListener("click", () => go("Member"));
+    $("watch").addEventListener("click", () => go("Guest"));
 
     loadHealth();
   </script>
