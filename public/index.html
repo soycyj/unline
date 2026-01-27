@@ -134,7 +134,7 @@
     const $ = (id) => document.getElementById(id);
 
      function go(label){
-      const room = ($("room").value || "VOICE01").trim();
+      const room = ($("room").value || "WELCOME").trim();
       const clientId = "c" + Math.random().toString(16).slice(2,10);
       location.href = `/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}&label=${encodeURIComponent(label)}`;
     }
