@@ -464,6 +464,24 @@
     padding-top: 64px;
   }
 }
+    @media (max-width: 768px) {
+  /* mHeader 높이 여유를 더 줘서 본문이 안 잘리게 */
+  body {
+    padding-top: 78px !important;
+  }
+
+  /* 첫 컨텐츠가 헤더에 붙어 잘리는 경우 방지 */
+  .shell,
+  .brand,
+  .hero {
+    scroll-margin-top: 88px;
+  }
+
+  /* 혹시 brand가 바로 위에 붙는 구조라면 추가 여백 */
+  .brand {
+    padding-top: 8px;
+  }
+}
   </style>
 </head>
 <body>
