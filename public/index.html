@@ -17,6 +17,7 @@
     }
     *{box-sizing:border-box}
     html,body{height:100%}
+
     body{
       margin:0;
       background:
@@ -321,183 +322,118 @@
       }
       .logo{font-size:26px}
     }
-    @media (max-width: 768px) {
-  /* 로고가 모바일에서 절대 안 숨겨지게 강제 */
-  .brand,
-  .logo,
-  .logoWrap,
-  #brand,
-  #brandHome {
-    display: inline-flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
 
-  /* 헤더에서 잘리는 문제 방지 */
-  .topbar,
-  header {
-    overflow: visible !important;
-  }
+    /* =========================
+       MOBILE FIXED HEADER
+       Only show on mobile, prevent text clipping under it
+       ========================= */
+    .mHeader{ display:none; }
 
-  /* 언어 선택 박스가 모바일에서 안 보이는 경우 강제 표시 */
-  .langSwitch,
-  #langSwitch {
-    display: inline-flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
+    @media (max-width:768px){
+      /* show fixed header */
+      .mHeader{
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        background: rgba(255,255,255,0.82);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(230,234,242,0.9);
+      }
 
-  /* 언어 버튼 터치 영역 확보 */
-  .langBtn {
-    min-width: 40px;
-    min-height: 36px;
-  }
-}
-    @media (max-width: 768px) {
-  /* index의 헤더 역할을 하는 상단 영역을 강제로 정렬 */
-  .brandTop {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 10px !important;
-    flex-wrap: nowrap !important;
-    min-width: 0 !important;
-  }
+      .mLogo{
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 16px;
+        background:
+          radial-gradient(180px 80px at 20% 20%, rgba(37,99,235,0.20) 0%, rgba(37,99,235,0) 70%),
+          radial-gradient(220px 90px at 80% 40%, rgba(168,85,247,0.16) 0%, rgba(168,85,247,0) 70%),
+          rgba(255,255,255,0.72);
+        border: 1px solid rgba(230,234,242,0.9);
+        box-shadow: 0 14px 36px rgba(15,23,42,0.10);
+        user-select: none;
+        white-space: nowrap;
+      }
+      .mLogoMark{
+        width: 18px;
+        height: 18px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
+        box-shadow: 0 10px 24px rgba(37,99,235,0.22);
+        flex: 0 0 auto;
+      }
+      .mLogoText{
+        background: linear-gradient(90deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        font-size: 16px;
+        font-weight: 950;
+        letter-spacing: -0.02em;
+      }
+      .mLangSwitch{
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid rgba(11,18,32,0.12);
+        border-radius: 14px;
+        overflow: hidden;
+        background: rgba(251,252,255,0.9);
+        box-shadow: 0 10px 24px rgba(15,23,42,0.06);
+      }
+      .mLangSwitch .langBtn{
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: rgba(11,18,32,0.62);
+        padding: 8px 10px;
+        min-width: 42px;
+        min-height: 36px;
+        font-weight: 950;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+      }
 
-  /* 로고가 모바일에서 안 보이는 핵심 방지 */
-  .logo {
-    display: inline-flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    flex: 0 0 auto !important;
-    white-space: nowrap !important;
-  }
+      /* PC 언어 스위치는 모바일에서 숨김 (중복 방지) */
+      .brandTop .langSwitch{
+        display:none !important;
+      }
 
-  /* 언어 선택 박스도 화면 밖으로 밀리지 않게 */
-  .langSwitch {
-    flex: 0 0 auto !important;
-  }
-}
-    @media (max-width: 768px) {
-  /* fixed header always visible */
-  .mHeader{
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 10px 12px;
-    background: rgba(255,255,255,0.82);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(230,234,242,0.9);
-    pointer-events: auto;
-  }
+      /* 헤더 높이만큼 아래로 내리기 (잘림 방지) */
+      body{
+        padding-top: 92px;
+        align-items: flex-start;
+      }
 
-  /* logo */
-  .mLogo{
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    border-radius: 16px;
-    background:
-      radial-gradient(180px 80px at 20% 20%, rgba(37,99,235,0.20) 0%, rgba(37,99,235,0) 70%),
-      radial-gradient(220px 90px at 80% 40%, rgba(168,85,247,0.16) 0%, rgba(168,85,247,0) 70%),
-      rgba(255,255,255,0.72);
-    border: 1px solid rgba(230,234,242,0.9);
-    box-shadow: 0 14px 36px rgba(15,23,42,0.10);
-    user-select: none;
-    white-space: nowrap;
-  }
-
-  .mLogoMark{
-    width: 18px;
-    height: 18px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
-    box-shadow: 0 10px 24px rgba(37,99,235,0.22);
-    flex: 0 0 auto;
-  }
-
-  .mLogoText{
-    background: linear-gradient(90deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    font-size: 16px;
-    font-weight: 950;
-    letter-spacing: -0.02em;
-  }
-
-  /* language switch always clickable */
-  .mLangSwitch{
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid rgba(11,18,32,0.12);
-    border-radius: 14px;
-    overflow: hidden;
-    background: rgba(251,252,255,0.9);
-    box-shadow: 0 10px 24px rgba(15,23,42,0.06);
-    pointer-events: auto;
-  }
-
-  .mLangSwitch .langBtn{
-    appearance: none;
-    border: 0;
-    background: transparent;
-    color: rgba(11,18,32,0.62);
-    padding: 8px 10px;
-    min-width: 42px;
-    min-height: 36px;
-    font-weight: 950;
-    font-size: 12px;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  /* push page content down so header does not cover it */
-  body{
-    padding-top: 64px;
-  }
-}
-    @media (max-width: 768px) {
-  /* mHeader 높이 여유를 더 줘서 본문이 안 잘리게 */
-  body {
-    padding-top: 78px !important;
-  }
-
-  /* 첫 컨텐츠가 헤더에 붙어 잘리는 경우 방지 */
-  .shell,
-  .brand,
-  .hero {
-    scroll-margin-top: 88px;
-  }
-
-  /* 혹시 brand가 바로 위에 붙는 구조라면 추가 여백 */
-  .brand {
-    padding-top: 8px;
-  }
-}
+      /* 모바일에서 shell이 위로 붙을 수 있게 */
+      .shell{
+        margin-top: 0;
+      }
+    }
   </style>
 </head>
 <body>
   <!-- Mobile fixed header for logo and language -->
-<div class="mHeader" role="banner">
-  <div class="mLogo" aria-label="unline">
-    <span class="mLogoMark" aria-hidden="true"></span>
-    <span class="mLogoText">unline</span>
-  </div>
+  <div class="mHeader" role="banner">
+    <div class="mLogo" aria-label="unline">
+      <span class="mLogoMark" aria-hidden="true"></span>
+      <span class="mLogoText">unline</span>
+    </div>
 
-  <div class="mLangSwitch langSwitch" role="group" aria-label="Language">
-    <button type="button" class="langBtn" data-lang="en" aria-pressed="false">EN</button>
-    <button type="button" class="langBtn" data-lang="ko" aria-pressed="false">KR</button>
-    <button type="button" class="langBtn" data-lang="ja" aria-pressed="false">JP</button>
+    <div class="mLangSwitch langSwitch" role="group" aria-label="Language">
+      <button type="button" class="langBtn" data-lang="en" aria-pressed="false">EN</button>
+      <button type="button" class="langBtn" data-lang="ko" aria-pressed="false">KR</button>
+      <button type="button" class="langBtn" data-lang="ja" aria-pressed="false">JP</button>
+    </div>
   </div>
-</div>
 
   <div class="shell">
     <div class="brand">
