@@ -475,6 +475,41 @@
     border-radius: 14px;
   }
 }
+    /* hide Home button but keep logic intact */
+#homeBtn { display:none !important; }
+    @media (max-width: 768px) {
+  /* top tools는 가로 스크롤이 생기므로, 색상 선택은 오른쪽 고정으로 빼준다 */
+  #colorInput {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 0 0 auto !important;
+  }
+
+  /* desktopTools 내부에서 colorInput이 밀려 사라지는 경우 방지 */
+  .right {
+    gap: 8px;
+  }
+
+  /* 도구줄이 스크롤되더라도 색상은 안 밀리게 */
+  .right .desktopTools {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* 언어 박스 옆에 색상 선택이 들어갈 공간 확보 */
+  .langSwitch {
+    margin-left: 6px;
+  }
+}
+@media (max-width: 768px) {
+  /* 가로 스크롤 안에서 색상 선택이 화면에 붙어있게 */
+  #colorInput {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+  }
+}
   </style>
 </head>
 <body>
