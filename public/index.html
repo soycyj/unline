@@ -418,6 +418,23 @@
         margin-top: 0;
       }
     }
+    @media (max-width: 768px) {
+  /* 모바일에서는 상단 고정 헤더(mHeader)에 로고가 있으니,
+     본문 쪽 로고 줄(brandTop)을 통째로 숨겨 중복 제거 */
+  .brandTop {
+    display: none !important;
+  }
+
+  /* brandTop이 사라지면 hero가 바로 위로 붙을 수 있으니 약간의 여백만 준다 */
+  .brand {
+    margin-top: 6px;
+  }
+
+  /* shell 상단이 너무 답답하면 padding 약간 조정 */
+  .shell {
+    padding-top: 18px;
+  }
+}
   </style>
 </head>
 <body>
