@@ -46,20 +46,55 @@
       z-index:20;
     }
     .left,.right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .left{min-width:0}
 
+    /* logo same as index */
     .brand{
-      display:flex;
+      display:inline-flex;
       align-items:center;
       gap:10px;
       font-weight:950;
       letter-spacing:-0.02em;
+      padding:8px 12px;
+      border-radius:16px;
+      background:
+        radial-gradient(180px 80px at 20% 20%, rgba(37,99,235,0.20) 0%, rgba(37,99,235,0) 70%),
+        radial-gradient(220px 90px at 80% 40%, rgba(168,85,247,0.16) 0%, rgba(168,85,247,0) 70%),
+        rgba(255,255,255,0.72);
+      border:1px solid rgba(230,234,242,0.9);
+      box-shadow:0 14px 36px rgba(15,23,42,0.10);
+      white-space:nowrap;
+      cursor:pointer;
+      user-select:none;
+      flex:0 0 auto;
     }
+    .logoMark{
+      width:18px;
+      height:18px;
+      border-radius:8px;
+      background:linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
+      box-shadow:0 10px 24px rgba(37,99,235,0.22);
+      flex:0 0 auto;
+    }
+    .logoText{
+      background:linear-gradient(90deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+      font-size:16px;
+      font-weight:950;
+      letter-spacing:-0.02em;
+    }
+
     .roomLine{
       color:var(--muted);
       font-weight:900;
       font-size:13px;
       letter-spacing:-0.01em;
       white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:46vw;
     }
 
     button{
@@ -199,23 +234,23 @@
     /* hide debug UI without removing logic */
     #connStatus, #wsTxt, #rtcTxt, #voiceState, #dbg { display:none; }
 
-    /* language switch */
+    /* language switch (kept OUTSIDE desktopTools so it remains clickable) */
     .langSwitch{
+      flex:0 0 auto;
       display:inline-flex;
       align-items:center;
-      border:1px solid var(--line);
-      border-radius:16px;
+      border:1px solid rgba(11,18,32,0.12);
+      border-radius:14px;
       overflow:hidden;
       background:#fbfcff;
       box-shadow:0 10px 24px rgba(15,23,42,0.06);
-      flex:0 0 auto;
     }
     .langBtn{
       appearance:none;
       border:0;
       background:transparent;
-      color:rgba(11,18,32,0.65);
-      padding:10px 10px;
+      color:rgba(11,18,32,0.62);
+      padding:8px 10px;
       width:44px;
       min-width:44px;
       text-align:center;
@@ -224,8 +259,6 @@
       line-height:1;
       cursor:pointer;
       user-select:none;
-      box-shadow:none;
-      border-radius:0;
     }
     .langBtn.isActive{
       background:rgba(37,99,235,0.10);
@@ -278,7 +311,9 @@
       .wrap{padding-bottom:86px}
     }
 
-    /* MOBILE TOPBAR COMPACT, KEEP ALL CONTROLS */
+    /* =========================
+       MOBILE TOPBAR COMPACT, KEEP ALL CONTROLS
+       ========================= */
     @media (max-width: 768px) {
       .topbar {
         padding: 6px 8px;
@@ -291,20 +326,16 @@
         min-width: 0;
       }
 
-      .brand {
-        font-size: 14px;
-        line-height: 1;
-      }
-
       .roomLine {
         font-size: 11px;
         line-height: 1;
-        max-width: 140px;
+        max-width: 34vw;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
 
+      /* mobile에서도 상단 도구는 숨기지 않는다 */
       .right .desktopTools {
         display: flex !important;
         flex-wrap: nowrap;
@@ -312,7 +343,7 @@
         gap: 8px;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
-        max-width: 62vw;
+        max-width: 50vw;
         padding-bottom: 2px;
       }
 
@@ -348,13 +379,6 @@
         border-radius: 14px;
       }
 
-      .langBtn{
-        padding:8px 8px;
-        width:40px;
-        min-width:40px;
-        font-size:12px;
-      }
-
       .wrap {
         padding: 10px 10px 72px 10px;
       }
@@ -362,24 +386,27 @@
       .stage {
         min-height: 380px;
       }
+
+      .langBtn{
+        width:40px;
+        min-width:40px;
+        padding:7px 8px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="topbar">
     <div class="left">
-      <div class="brand">unline</div>
+      <div class="brand" id="brandHome" role="button" tabindex="0" aria-label="Home">
+        <span class="logoMark" aria-hidden="true"></span>
+        <span class="logoText">unline</span>
+      </div>
       <div class="roomLine" id="roomLine">Room</div>
     </div>
 
     <div class="right">
       <div class="desktopTools" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <div class="langSwitch" role="group" aria-label="Language">
-          <button type="button" class="langBtn" data-lang="en" aria-pressed="false">EN</button>
-          <button type="button" class="langBtn" data-lang="ko" aria-pressed="false">KR</button>
-          <button type="button" class="langBtn" data-lang="ja" aria-pressed="false">JP</button>
-        </div>
-
         <button id="homeBtn">Home</button>
 
         <button id="penBtn" class="primary">Pen</button>
@@ -395,6 +422,12 @@
         <button id="goRoomBtn">Go</button>
         <button id="clearBtn" class="danger">Clear</button>
       </div>
+
+      <div class="langSwitch" role="group" aria-label="Language">
+        <button type="button" class="langBtn" data-lang="en" aria-pressed="false">EN</button>
+        <button type="button" class="langBtn" data-lang="ko" aria-pressed="false">KR</button>
+        <button type="button" class="langBtn" data-lang="ja" aria-pressed="false">JP</button>
+      </div>
     </div>
   </div>
 
@@ -402,7 +435,7 @@
     <div class="col">
       <div class="card">
         <h3 id="peopleTitle">People</h3>
-        <div id="manageBox" style="display:none">
+        <div id="manageBox">
           <div id="userList"></div>
         </div>
         <div class="meta" id="hintTxt"></div>
@@ -426,7 +459,7 @@
   </div>
 
   <!-- mobile floating controls -->
-  <div class="fabBar" id="fabBar" aria-label="mobile controls">
+  <div class="fabBar" aria-label="mobile controls">
     <div class="fabBtn" id="fabMic" title="Voice">🎤</div>
     <div class="fabBtn on" id="fabPen" title="Pen">✏️</div>
     <div class="fabBtn" id="fabEraser" title="Eraser">🧽</div>
@@ -440,176 +473,146 @@
     const $ = (id) => document.getElementById(id);
 
     /* =========================
-       i18n
+       i18n layer (UI text only)
        ========================= */
     const LANG_KEY = "unline_lang";
-    const SUPPORTED = new Set(["en","ko","ja"]);
-    let currentLang = "en";
+    const SUPPORTED_LANGS = new Set(["en","ko","ja"]);
+    let uiLang = "en";
 
     const I18N = {
       en: {
+        peopleTitle: "People",
+        voiceTitle: "Voice",
         home: "Home",
         pen: "Pen",
         eraser: "Eraser",
         roomPlaceholder: "Room",
         go: "Go",
         clear: "Clear",
-        peopleTitle: "People",
-        voiceTitle: "Voice",
         startVoice: "Start voice",
         stop: "Stop",
         you: "You",
         member: "Member",
-        roomPrefix: "Room",
-        peopleSuffix: "people",
+        roleViewer: "Viewer",
+        roleParticipant: "Participant",
         hint1: "Join the same room to connect instantly.",
         hint2: "Voice and drawing work in participant mode.",
-        confirmJoinVoice: "Join the voice chat?",
-        notAllowed: "Not allowed",
-        requesting: "Requesting",
-        accepted: "Accepted",
-        connecting: "Connecting",
-        connected: "Connected",
-        rejected: "Rejected",
-        stopped: "Stopped",
-        peerStopped: "Peer stopped",
-        voiceError: "Voice error",
-        fabMicTitle: "Voice",
-        fabPenTitle: "Pen",
-        fabEraserTitle: "Eraser",
-        mobileControlsAria: "mobile controls"
+        confirmVoice: "Join voice chat?",
+        roomLabel: "Room",
+        peopleWord: "people"
       },
       ko: {
-        home: "홈",
-        pen: "펜",
-        eraser: "지우개",
-        roomPlaceholder: "방 코드",
+        peopleTitle: "People",
+        voiceTitle: "Voice",
+        home: "Home",
+        pen: "Pen",
+        eraser: "Eraser",
+        roomPlaceholder: "방",
         go: "이동",
         clear: "지우기",
-        peopleTitle: "사람",
-        voiceTitle: "음성",
-        startVoice: "음성 시작",
+        startVoice: "보이스 시작",
         stop: "중지",
         you: "나",
         member: "멤버",
-        roomPrefix: "방",
-        peopleSuffix: "명",
+        roleViewer: "뷰어",
+        roleParticipant: "참가자",
         hint1: "같은 방 이름으로 접속하면 바로 연결됩니다.",
-        hint2: "음성과 그림은 participant에서 사용됩니다.",
-        confirmJoinVoice: "보이스 대화에 참여할까요?",
-        notAllowed: "권한 없음",
-        requesting: "요청 중",
-        accepted: "수락됨",
-        connecting: "연결 중",
-        connected: "연결됨",
-        rejected: "거절됨",
-        stopped: "중지됨",
-        peerStopped: "상대가 종료함",
-        voiceError: "음성 오류",
-        fabMicTitle: "음성",
-        fabPenTitle: "펜",
-        fabEraserTitle: "지우개",
-        mobileControlsAria: "모바일 컨트롤"
+        hint2: "보이스와 그림은 참가자 모드에서 사용됩니다.",
+        confirmVoice: "보이스 대화에 참여할까요?",
+        roomLabel: "방",
+        peopleWord: "명"
       },
       ja: {
-        home: "ホーム",
-        pen: "ペン",
-        eraser: "消しゴム",
-        roomPlaceholder: "ルームコード",
+        peopleTitle: "People",
+        voiceTitle: "Voice",
+        home: "Home",
+        pen: "Pen",
+        eraser: "Eraser",
+        roomPlaceholder: "ルーム",
         go: "移動",
         clear: "クリア",
-        peopleTitle: "参加者",
-        voiceTitle: "音声",
-        startVoice: "音声開始",
+        startVoice: "音声を開始",
         stop: "停止",
         you: "自分",
         member: "メンバー",
-        roomPrefix: "ルーム",
-        peopleSuffix: "人",
+        roleViewer: "閲覧",
+        roleParticipant: "参加",
         hint1: "同じルーム名で入るとすぐ接続されます。",
-        hint2: "音声と描画は participant で利用できます。",
-        confirmJoinVoice: "音声チャットに参加しますか？",
-        notAllowed: "許可なし",
-        requesting: "リクエスト中",
-        accepted: "承認",
-        connecting: "接続中",
-        connected: "接続完了",
-        rejected: "拒否",
-        stopped: "停止",
-        peerStopped: "相手が終了",
-        voiceError: "音声エラー",
-        fabMicTitle: "音声",
-        fabPenTitle: "ペン",
-        fabEraserTitle: "消しゴム",
-        mobileControlsAria: "モバイル操作"
+        hint2: "音声と描画は参加モードで使えます。",
+        confirmVoice: "音声チャットに参加しますか？",
+        roomLabel: "ルーム",
+        peopleWord: "人"
       }
     };
 
-    function getStoredLang() {
+    function t(key){
+      const d = I18N[uiLang] || I18N.en;
+      return d[key] || (I18N.en[key] || key);
+    }
+
+    function getStoredLang(){
       const v = localStorage.getItem(LANG_KEY);
-      if (v && SUPPORTED.has(v)) return v;
+      if (v && SUPPORTED_LANGS.has(v)) return v;
       return "en";
     }
 
-    function setStoredLang(lang) {
+    function setStoredLang(lang){
       localStorage.setItem(LANG_KEY, lang);
     }
 
-    function t(key) {
-      const dict = I18N[currentLang] || I18N.en;
-      return dict[key] ?? (I18N.en[key] ?? "");
-    }
+    function applyLang(lang){
+      uiLang = SUPPORTED_LANGS.has(lang) ? lang : "en";
+      document.documentElement.lang = uiLang;
 
-    function applyLang(lang) {
-      currentLang = SUPPORTED.has(lang) ? lang : "en";
-      setStoredLang(currentLang);
-      document.documentElement.lang = currentLang;
+      $("peopleTitle").textContent = t("peopleTitle");
+      $("voiceTitle").textContent = t("voiceTitle");
 
-      if ($("homeBtn")) $("homeBtn").textContent = t("home");
-      if ($("penBtn")) $("penBtn").textContent = t("pen");
-      if ($("eraserBtn")) $("eraserBtn").textContent = t("eraser");
-      if ($("roomInput")) $("roomInput").placeholder = t("roomPlaceholder");
-      if ($("goRoomBtn")) $("goRoomBtn").textContent = t("go");
-      if ($("clearBtn")) $("clearBtn").textContent = t("clear");
-      if ($("peopleTitle")) $("peopleTitle").textContent = t("peopleTitle");
-      if ($("voiceTitle")) $("voiceTitle").textContent = t("voiceTitle");
-      if ($("startVoiceBtn")) $("startVoiceBtn").textContent = t("startVoice");
-      if ($("stopVoiceBtn")) $("stopVoiceBtn").textContent = t("stop");
+      $("homeBtn").textContent = t("home");
+      $("penBtn").textContent = t("pen");
+      $("eraserBtn").textContent = t("eraser");
+      $("goRoomBtn").textContent = t("go");
+      $("clearBtn").textContent = t("clear");
 
-      const fabBar = $("fabBar");
-      if (fabBar) fabBar.setAttribute("aria-label", t("mobileControlsAria"));
+      $("roomInput").placeholder = t("roomPlaceholder");
 
-      const fabMic = $("fabMic");
-      const fabPen = $("fabPen");
-      const fabEraser = $("fabEraser");
-      if (fabMic) fabMic.title = t("fabMicTitle");
-      if (fabPen) fabPen.title = t("fabPenTitle");
-      if (fabEraser) fabEraser.title = t("fabEraserTitle");
+      $("startVoiceBtn").textContent = t("startVoice");
+      $("stopVoiceBtn").textContent = t("stop");
 
       document.querySelectorAll(".langBtn").forEach(btn => {
-        const isActive = btn.dataset.lang === currentLang;
-        btn.classList.toggle("isActive", isActive);
-        btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+        const active = btn.dataset.lang === uiLang;
+        btn.classList.toggle("isActive", active);
+        btn.setAttribute("aria-pressed", active ? "true" : "false");
       });
 
-      updateUi();
+      /* IMPORTANT: no updateUi() call here (prevents breaking voice/tool logic) */
     }
 
-    function initI18nUi() {
+    function initLangSwitch(){
       const initial = getStoredLang();
       applyLang(initial);
 
       document.querySelectorAll(".langBtn").forEach(btn => {
         btn.addEventListener("click", () => {
           const lang = btn.dataset.lang;
-          if (!SUPPORTED.has(lang)) return;
+          if (!SUPPORTED_LANGS.has(lang)) return;
+          setStoredLang(lang);
           applyLang(lang);
+          renderUserList();
+          updateRoomLine();
+          updateHintOnly();
         });
       });
     }
 
+    function updateHintOnly(){
+      const hint = [];
+      hint.push(t("hint1"));
+      hint.push(t("hint2"));
+      $("hintTxt").textContent = hint.join("\n");
+    }
+
     /* =========================
-       existing app logic
+       ORIGINAL LOGIC (kept)
        ========================= */
     const qs = new URLSearchParams(location.search);
     let room = (qs.get("room") || "WELCOME").trim();
@@ -654,6 +657,9 @@
       $("fabPen").classList.toggle("on", toolMode === "pen");
       $("fabEraser").classList.toggle("on", toolMode === "eraser");
     }
+
+    $("brandHome").addEventListener("click", () => { location.href = "/"; });
+    $("brandHome").addEventListener("keydown", (e) => { if (e.key === "Enter") location.href = "/"; });
 
     $("homeBtn").addEventListener("click", () => { location.href = "/"; });
 
@@ -717,20 +723,34 @@
         badge.className = "badge";
         badge.style.background = u.color || "#94a3b8";
 
-        const txt = document.createElement("div");
-        txt.style.fontSize = "13px";
-        txt.style.fontWeight = "950";
-        txt.style.color = "var(--text)";
-        txt.textContent = u.clientId === clientId ? t("you") : (u.label || t("member"));
+        const txtWrap = document.createElement("div");
+        txtWrap.style.display = "flex";
+        txtWrap.style.flexDirection = "column";
+        txtWrap.style.gap = "2px";
+
+        const name = document.createElement("div");
+        name.style.fontSize = "13px";
+        name.style.fontWeight = "950";
+        name.style.color = "var(--text)";
+        name.textContent = u.clientId === clientId ? t("you") : (u.label || t("member"));
+
+        const roleLine = document.createElement("div");
+        roleLine.style.fontSize = "12px";
+        roleLine.style.fontWeight = "850";
+        roleLine.style.color = "var(--muted)";
+        roleLine.textContent = u.role === "participant" ? t("roleParticipant") : t("roleViewer");
+
+        txtWrap.appendChild(name);
+        txtWrap.appendChild(roleLine);
 
         left.appendChild(badge);
-        left.appendChild(txt);
+        left.appendChild(txtWrap);
 
         const right = document.createElement("div");
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = u.role === "participant";
-        cb.disabled = u.clientId === clientId;
+        cb.disabled = (meRole !== "participant") || (u.clientId === clientId);
         cb.addEventListener("change", () => {
           send("set_role", { targetClientId: u.clientId, role: cb.checked ? "participant" : "viewer" });
         });
@@ -743,8 +763,10 @@
     }
 
     function updateRoomLine() {
-      const peopleText = `${visitors} ${t("peopleSuffix")}`;
-      $("roomLine").textContent = `${t("roomPrefix")} ${room} · ${peopleText}`;
+      const peopleText = uiLang === "ko"
+        ? `${visitors}${t("peopleWord")}`
+        : `${visitors} ${t("peopleWord")}`;
+      $("roomLine").textContent = `${t("roomLabel")} ${room} · ${peopleText}`;
     }
 
     function updateUi() {
@@ -752,15 +774,12 @@
       $("startVoiceBtn").disabled = !canVoice() || callActive;
       $("stopVoiceBtn").disabled = !callActive;
 
-      $("manageBox").style.display = meRole === "participant" ? "block" : "none";
-      if (meRole === "participant") renderUserList();
+      /* UI-only change: always show who is inside */
+      $("manageBox").style.display = "block";
+      renderUserList();
 
       updateRoomLine();
-
-      const hint = [];
-      hint.push(t("hint1"));
-      hint.push(t("hint2"));
-      $("hintTxt").textContent = hint.join("\n");
+      updateHintOnly();
     }
 
     function connect() {
@@ -779,4 +798,328 @@
       });
 
       ws.addEventListener("message", (evt) => {
-        let
+        let msg;
+        try { msg = JSON.parse(evt.data); } catch { return; }
+
+        if (msg.type === "room_state") {
+          visitors = msg.visitors ?? visitors;
+          users = msg.users ?? users;
+
+          const me = users.find(x => x.clientId === clientId);
+          if (me && me.role) meRole = me.role;
+
+          updateUi();
+          return;
+        }
+
+        if (msg.type === "canvas_snapshot") {
+          applySnapshot(msg.strokes || []);
+          return;
+        }
+
+        if (msg.type === "draw") { drawStroke(msg); return; }
+        if (msg.type === "clear") { clearCanvas(false); return; }
+
+        if (msg.type === "voice_request") return onVoiceRequest(msg);
+        if (msg.type === "voice_accept") return onVoiceAccept(msg);
+        if (msg.type === "voice_reject") return onVoiceReject(msg);
+        if (msg.type === "voice_offer") return onVoiceOffer(msg);
+        if (msg.type === "voice_answer") return onVoiceAnswer(msg);
+        if (msg.type === "voice_ice") return onVoiceIce(msg);
+        if (msg.type === "voice_stop") return onVoiceStop(msg);
+      });
+    }
+
+    $("goRoomBtn").addEventListener("click", () => {
+      const nextRoom = ($("roomInput").value || "").trim();
+      if (!nextRoom) return;
+      room = nextRoom;
+      if (ws) { try { ws.close(); } catch {} }
+      clearCanvas(false);
+      connect();
+      updateUi();
+    });
+
+    const canvas = $("board");
+    const ctx = canvas.getContext("2d");
+
+    function resize(){
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    function clearCanvas(broadcast) {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if (broadcast) send("clear", {});
+    }
+
+    $("clearBtn").addEventListener("click", () => {
+      if (!canDraw()) return;
+      clearCanvas(true);
+    });
+
+    function drawStroke(s) {
+      const a = s.a, b = s.b;
+      const mode = s.mode || "pen";
+      const w = Number(s.w || 3);
+      const color = s.color || "#111827";
+
+      const prev = ctx.globalCompositeOperation;
+      if (mode === "eraser") {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.strokeStyle = "rgba(0,0,0,1)";
+      } else {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = color;
+      }
+
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+
+      ctx.globalCompositeOperation = prev;
+    }
+
+    function applySnapshot(strokes) {
+      clearCanvas(false);
+      for (const s of strokes) drawStroke(s);
+    }
+
+    function posFromEvent(e){
+      const rect = canvas.getBoundingClientRect();
+      return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
+    }
+
+    let drawing = false;
+    let last = null;
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!canDraw()) return;
+      drawing = true;
+      last = posFromEvent(e);
+      canvas.setPointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drawing) return;
+      const p = posFromEvent(e);
+
+      const stroke = { a: last, b: p, mode: toolMode, color: penColor, w: penWidth };
+      drawStroke(stroke);
+      send("draw", stroke);
+      last = p;
+    });
+
+    canvas.addEventListener("pointerup", () => { drawing = false; last = null; });
+    canvas.addEventListener("pointercancel", () => { drawing = false; last = null; });
+
+    let iceServers = [{ urls: ["stun:stun.l.google.com:19302"] }];
+
+    async function loadIceServers() {
+      try {
+        const r = await fetch("/api/ice", { cache: "no-store" });
+        const j = await r.json();
+        if (j && j.ok && Array.isArray(j.iceServers) && j.iceServers.length) {
+          iceServers = j.iceServers;
+        }
+      } catch {}
+    }
+
+    let audioCtx = null;
+    async function unlockAudioNoWait() {
+      try {
+        const a = $("remoteAudio");
+        try { a.muted = false; } catch {}
+        try { await a.play(); } catch {}
+
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx && !audioCtx) audioCtx = new Ctx();
+        if (audioCtx && audioCtx.state === "suspended") {
+          try { await audioCtx.resume(); } catch {}
+        }
+      } catch {}
+    }
+
+    let pc = null;
+    let localStream = null;
+    let callActive = false;
+
+    function setVoiceState(tState) {
+      $("voiceState").textContent = tState || "Idle";
+      setRtcState(tState || "idle");
+      updateUi();
+    }
+
+    async function ensureLocalAudio() {
+      if (localStream) return localStream;
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true },
+        video: false
+      });
+      return localStream;
+    }
+
+    async function createPeer() {
+      pc = new RTCPeerConnection({ iceServers });
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) send("voice_ice", { candidate: e.candidate });
+      };
+
+      pc.ontrack = async (e) => {
+        const stream = e.streams && e.streams[0];
+        if (!stream) return;
+        const a = $("remoteAudio");
+        a.srcObject = stream;
+        try { await a.play(); } catch {}
+      };
+
+      const s = await ensureLocalAudio();
+      s.getTracks().forEach(tk => pc.addTrack(tk, s));
+    }
+
+    function teardownVoice(state) {
+      try { if (pc) pc.close(); } catch {}
+      pc = null;
+
+      try { if (localStream) localStream.getTracks().forEach(tk => tk.stop()); } catch {}
+      localStream = null;
+
+      callActive = false;
+      setVoiceState(state || "Idle");
+      dbg("");
+    }
+
+    $("startVoiceBtn").addEventListener("click", async () => {
+      if (!canVoice()) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (callActive) return;
+
+      setVoiceState("Requesting");
+      unlockAudioNoWait();
+
+      try { await ensureLocalAudio(); }
+      catch { setVoiceState("Idle"); return; }
+
+      send("voice_request", {});
+    });
+
+    $("stopVoiceBtn").addEventListener("click", () => {
+      if (!callActive) return;
+      send("voice_stop", {});
+      teardownVoice("Stopped");
+    });
+
+    function onVoiceRequest() {
+      if (!canVoice()) { send("voice_reject", { reason: "not_allowed" }); return; }
+      if (callActive) { send("voice_reject", { reason: "busy" }); return; }
+
+      const ok = confirm(t("confirmVoice"));
+      if (!ok) { send("voice_reject", { reason: "rejected" }); return; }
+
+      unlockAudioNoWait();
+      send("voice_accept", {});
+      setVoiceState("Accepted");
+    }
+
+    async function onVoiceAccept() {
+      try {
+        callActive = true;
+        setVoiceState("Connecting");
+
+        await createPeer();
+
+        const offer = await pc.createOffer({ offerToReceiveAudio: true });
+        await pc.setLocalDescription(offer);
+
+        send("voice_offer", { sdp: offer });
+        setVoiceState("Connecting");
+      } catch {
+        teardownVoice("Voice error");
+      }
+    }
+
+    function onVoiceReject() {
+      callActive = false;
+      setVoiceState("Rejected");
+    }
+
+    async function onVoiceOffer(msg) {
+      try {
+        callActive = true;
+        setVoiceState("Connecting");
+
+        await createPeer();
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        send("voice_answer", { sdp: answer });
+        setVoiceState("Connecting");
+      } catch {
+        teardownVoice("Voice error");
+      }
+    }
+
+    async function onVoiceAnswer(msg) {
+      if (!pc) return;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        setVoiceState("Connected");
+      } catch {
+        teardownVoice("Voice error");
+      }
+    }
+
+    async function onVoiceIce(msg) {
+      if (!pc || !msg || !msg.candidate) return;
+      try { await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)); } catch {}
+    }
+
+    function onVoiceStop() {
+      teardownVoice("Peer stopped");
+    }
+
+    /* mobile floating controls map to existing buttons */
+    $("fabPen").addEventListener("click", () => $("penBtn").click());
+    $("fabEraser").addEventListener("click", () => $("eraserBtn").click());
+
+    function refreshMicFab() {
+      $("fabMic").classList.toggle("on", callActive);
+    }
+
+    const origSetVoiceState = setVoiceState;
+    setVoiceState = function(tState){
+      origSetVoiceState(tState);
+      refreshMicFab();
+    };
+
+    $("fabMic").addEventListener("click", () => {
+      if (callActive) $("stopVoiceBtn").click();
+      else $("startVoiceBtn").click();
+      refreshMicFab();
+    });
+
+    async function boot() {
+      initLangSwitch();
+      syncToolUi();
+      await loadIceServers();
+      connect();
+      updateUi();
+      refreshMicFab();
+    }
+
+    boot();
+  </script>
+</body>
+</html>
