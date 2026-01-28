@@ -353,6 +353,31 @@
     min-height: 36px;
   }
 }
+    @media (max-width: 768px) {
+  /* index의 헤더 역할을 하는 상단 영역을 강제로 정렬 */
+  .brandTop {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+    min-width: 0 !important;
+  }
+
+  /* 로고가 모바일에서 안 보이는 핵심 방지 */
+  .logo {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+
+  /* 언어 선택 박스도 화면 밖으로 밀리지 않게 */
+  .langSwitch {
+    flex: 0 0 auto !important;
+  }
+}
   </style>
 </head>
 <body>
