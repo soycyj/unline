@@ -378,6 +378,92 @@
     flex: 0 0 auto !important;
   }
 }
+    @media (max-width: 768px) {
+  /* fixed header always visible */
+  .mHeader{
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(230,234,242,0.9);
+    pointer-events: auto;
+  }
+
+  /* logo */
+  .mLogo{
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 16px;
+    background:
+      radial-gradient(180px 80px at 20% 20%, rgba(37,99,235,0.20) 0%, rgba(37,99,235,0) 70%),
+      radial-gradient(220px 90px at 80% 40%, rgba(168,85,247,0.16) 0%, rgba(168,85,247,0) 70%),
+      rgba(255,255,255,0.72);
+    border: 1px solid rgba(230,234,242,0.9);
+    box-shadow: 0 14px 36px rgba(15,23,42,0.10);
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .mLogoMark{
+    width: 18px;
+    height: 18px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
+    box-shadow: 0 10px 24px rgba(37,99,235,0.22);
+    flex: 0 0 auto;
+  }
+
+  .mLogoText{
+    background: linear-gradient(90deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: 16px;
+    font-weight: 950;
+    letter-spacing: -0.02em;
+  }
+
+  /* language switch always clickable */
+  .mLangSwitch{
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(11,18,32,0.12);
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(251,252,255,0.9);
+    box-shadow: 0 10px 24px rgba(15,23,42,0.06);
+    pointer-events: auto;
+  }
+
+  .mLangSwitch .langBtn{
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: rgba(11,18,32,0.62);
+    padding: 8px 10px;
+    min-width: 42px;
+    min-height: 36px;
+    font-weight: 950;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  /* push page content down so header does not cover it */
+  body{
+    padding-top: 64px;
+  }
+}
   </style>
 </head>
 <body>
