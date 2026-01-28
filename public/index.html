@@ -321,6 +321,38 @@
       }
       .logo{font-size:26px}
     }
+    @media (max-width: 768px) {
+  /* 로고가 모바일에서 절대 안 숨겨지게 강제 */
+  .brand,
+  .logo,
+  .logoWrap,
+  #brand,
+  #brandHome {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* 헤더에서 잘리는 문제 방지 */
+  .topbar,
+  header {
+    overflow: visible !important;
+  }
+
+  /* 언어 선택 박스가 모바일에서 안 보이는 경우 강제 표시 */
+  .langSwitch,
+  #langSwitch {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  /* 언어 버튼 터치 영역 확보 */
+  .langBtn {
+    min-width: 40px;
+    min-height: 36px;
+  }
+}
   </style>
 </head>
 <body>
