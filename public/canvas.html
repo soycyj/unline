@@ -860,6 +860,7 @@
         txtWrap.style.alignItems = "center";
         txtWrap.style.gap = "6px";
         txtWrap.style.minWidth = "0";
+        txtWrap.style.flexWrap = "nowrap";
 
         const name = document.createElement("div");
         name.className = "userNameLine";
@@ -867,6 +868,8 @@
         name.style.fontWeight = "950";
         name.style.color = "var(--text)";
         name.textContent = u.clientId === clientId ? t("you") : (u.label || t("member"));
+        name.style.whiteSpace = "nowrap";
+        name.style.flex = "0 0 auto";
 
         const roleLine = document.createElement("div");
         roleLine.className = "userRoleLine";
@@ -874,7 +877,8 @@
         roleLine.style.fontWeight = "850";
         roleLine.style.color = "var(--muted)";
         roleLine.textContent = "· " + (u.role === "participant" ? t("roleParticipant") : t("roleViewer"));
-
+        roleLine.style.whiteSpace = "nowrap";
+        roleLine.style.flex = "0 0 auto";
 
         txtWrap.appendChild(name);
         txtWrap.appendChild(roleLine);
