@@ -1,749 +1,231 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>unline</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>unline - words fall short, draw it.</title>
   <style>
-    :root{
-      --bg:#f6f8fb;
-      --card:#ffffff;
-      --line:#e6eaf2;
-      --text:#0b1220;
-      --muted:#5a677f;
-      --btn:#2563eb;
-      --shadow: 0 14px 44px rgba(15,23,42,0.10);
-      --radius:20px;
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --muted: #666666;
+      --accent: #000000;
+      --border: #eeeeee;
     }
-    *{box-sizing:border-box}
-    html,body{height:100%}
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    
+    .mHeader {
+        position: fixed; top: 0; left: 0; right: 0; height: 60px;
+        background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+        display: none; align-items: center; justify-content: space-between;
+        padding: 0 20px; border-bottom: 1px solid var(--border); z-index: 1000;
+    }
+    .mLogo { font-weight: 800; font-size: 1.2rem; letter-spacing: -0.02em; }
 
-    body{
-      margin:0;
-      background:
-        radial-gradient(1200px 700px at 18% 10%, #eaf2ff 0%, rgba(234,242,255,0) 60%),
-        radial-gradient(900px 520px at 82% 0%, #f1ecff 0%, rgba(241,236,255,0) 55%),
-        var(--bg);
-      color:var(--text);
-      font-family:system-ui,-apple-system,Segoe UI,Roboto;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:22px;
+    .shell { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+    
+    .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 80px; }
+    .brand { font-weight: 800; font-size: 1.5rem; letter-spacing: -0.03em; }
+    
+    .lang-switch { display: flex; gap: 10px; }
+    .lang-btn {
+      background: none; border: 1px solid var(--border); padding: 4px 10px;
+      font-size: 0.8rem; cursor: pointer; border-radius: 4px; color: var(--muted);
+      transition: all 0.2s;
     }
+    .lang-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
-    .shell{
-      width:min(980px,100%);
-      background:
-        radial-gradient(820px 360px at 20% 0%, rgba(37,99,235,0.10) 0%, rgba(37,99,235,0) 70%),
-        radial-gradient(760px 320px at 80% 10%, rgba(168,85,247,0.08) 0%, rgba(168,85,247,0) 70%),
-        rgba(255,255,255,0.82);
-      border:1px solid var(--line);
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      padding:26px;
-      backdrop-filter: blur(12px);
-    }
-
-    .brand{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      margin-bottom:18px;
-      min-width:0;
-    }
-    .brandTop{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      min-width:0;
+    .hero { text-align: center; padding: 100px 0 60px; }
+    .hero h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 20px; line-height: 1.1; }
+    .hero p { font-size: 1.25rem; color: var(--muted); max-width: 600px; margin: 0 auto; }
+    
+    /* 레오 추가: 강조 문구 스타일 */
+    #roomNotice { 
+      margin-top: 24px; 
+      font-size: 1rem; 
+      font-weight: 500; 
+      color: var(--muted); 
     }
 
-    .logo{
-      position:relative;
-      font-size:28px;
-      font-weight:950;
-      letter-spacing:-0.03em;
-      padding:8px 12px;
-      border-radius:16px;
-      background:
-        radial-gradient(180px 80px at 20% 20%, rgba(37,99,235,0.20) 0%, rgba(37,99,235,0) 70%),
-        radial-gradient(220px 90px at 80% 40%, rgba(168,85,247,0.16) 0%, rgba(168,85,247,0) 70%),
-        rgba(255,255,255,0.72);
-      border:1px solid rgba(230,234,242,0.9);
-      box-shadow:0 14px 36px rgba(15,23,42,0.10);
-      display:inline-flex;
-      align-items:center;
-      gap:10px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      min-width:0;
+    .btn {
+      display: inline-block; background: var(--accent); color: #fff;
+      padding: 16px 40px; border-radius: 12px; font-weight: 600; font-size: 1.1rem;
+      border: none; cursor: pointer; transition: transform 0.2s;
     }
-    .logoText{
-      background:linear-gradient(90deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
-      -webkit-background-clip:text;
-      background-clip:text;
-      color:transparent;
-    }
-    .logoMark{
-      width:18px;
-      height:18px;
-      border-radius:8px;
-      background:linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
-      box-shadow:0 10px 24px rgba(37,99,235,0.22);
-      flex:0 0 auto;
-    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn:active { transform: translateY(0); }
 
-    .langSwitch{
-      flex:0 0 auto;
-      display:inline-flex;
-      align-items:center;
-      border:1px solid var(--line);
-      border-radius:14px;
-      overflow:hidden;
-      background:#fbfcff;
-      box-shadow:0 10px 24px rgba(15,23,42,0.06);
+    .input-group { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
+    input[type="text"] {
+      padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 1rem; width: 240px; outline: none;
     }
-    .langBtn{
-      appearance:none;
-      border:0;
-      background:transparent;
-      color:rgba(11,18,32,0.62);
-      padding:8px 10px;
-      width:44px;
-      min-width:44px;
-      text-align:center;
-      font-weight:950;
-      font-size:12px;
-      line-height:1;
-      cursor:pointer;
-      user-select:none;
-    }
-    .langBtn.isActive{
-      background:rgba(37,99,235,0.10);
-      color:rgba(11,18,32,0.95);
-    }
+    input[type="text"]:focus { border-color: #999; }
 
-    .hero{
-      font-size:22px;
-      font-weight:950;
-      letter-spacing:-0.02em;
-      line-height:1.25;
-    }
-    .sub{
-      color:var(--muted);
-      font-size:14px;
-      font-weight:800;
-      line-height:1.6;
-      margin-top:4px;
-      white-space:pre-line;
-    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 100px; }
+    .card { padding: 40px; border: 1px solid var(--border); border-radius: 24px; transition: border-color 0.3s; }
+    .card:hover { border-color: #ddd; }
+    .card h3 { font-size: 1.5rem; margin-bottom: 12px; font-weight: 700; }
+    .card p { color: var(--muted); }
 
-    .entry{
-      margin-top:18px;
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      align-items:stretch;
-    }
-
-    .roomInput{
-      flex:1;
-      min-width:240px;
-      padding:18px 18px;
-      border-radius:18px;
-      border:2px solid rgba(37,99,235,0.22);
-      background:linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
-      color:var(--text);
-      font-weight:950;
-      font-size:18px;
-      outline:none;
-      box-shadow:
-        0 18px 44px rgba(15,23,42,0.10),
-        0 0 0 4px rgba(37,99,235,0.10);
-    }
-    .roomInput:focus{
-      border-color: rgba(37,99,235,0.45);
-      box-shadow:
-        0 22px 54px rgba(37,99,235,0.18),
-        0 0 0 5px rgba(37,99,235,0.16);
-    }
-    .roomInput::placeholder{
-      color:rgba(90,103,127,0.70);
-      font-weight:900;
-      letter-spacing:0.06em;
-      text-transform:uppercase;
-    }
-
-    .btn{
-      padding:18px 18px;
-      border-radius:18px;
-      border:1px solid rgba(37,99,235,0.25);
-      background:linear-gradient(180deg, #2f6bff 0%, #1f56e8 100%);
-      color:#fff;
-      font-weight:950;
-      font-size:18px;
-      cursor:pointer;
-      box-shadow:0 18px 44px rgba(37,99,235,0.24);
-      min-width:170px;
-    }
-
-    .hint{
-      margin-top:10px;
-      color:var(--muted);
-      font-size:13px;
-      font-weight:800;
-    }
-
-    .modes{
-      margin-top:22px;
-      border-top:1px solid var(--line);
-      padding-top:18px;
-    }
-    .modesTitle{
-      font-size:14px;
-      font-weight:950;
-      letter-spacing:-0.01em;
-      margin:0 0 12px;
-    }
-    .cards{
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:12px;
-    }
-    .card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:14px;
-      box-shadow:0 10px 26px rgba(15,23,42,0.06);
-      cursor:pointer;
-      user-select:none;
-      transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
-      min-height:120px;
-      position:relative;
-      overflow:hidden;
-    }
-    .card:active{transform:scale(0.99)}
-    .card.selected{
-      border-color: rgba(37,99,235,0.55);
-      box-shadow:0 16px 44px rgba(37,99,235,0.16);
-    }
-    .cardTop{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom:8px;
-    }
-    .cardName{
-      font-weight:950;
-      font-size:14px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-    .cardLine{
-      color:var(--muted);
-      font-weight:900;
-      font-size:13px;
-      line-height:1.35;
-      word-break:keep-all;
-    }
-    .cardDesc{
-      color:var(--muted);
-      font-weight:800;
-      font-size:12px;
-      line-height:1.5;
-      margin-top:8px;
-      word-break:keep-all;
-    }
-    .chip{
-      font-size:12px;
-      font-weight:950;
-      color:rgba(11,18,32,0.72);
-      background:#f2f5fb;
-      border:1px solid var(--line);
-      padding:6px 10px;
-      border-radius:999px;
-      white-space:nowrap;
-      flex:0 0 auto;
-    }
-    .smallNote{
-      margin-top:10px;
-      color:var(--muted);
-      font-size:12px;
-      font-weight:800;
-    }
-
-    .bgGrid::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      background-image:
-        linear-gradient(rgba(37,99,235,0.10) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(37,99,235,0.10) 1px, transparent 1px);
-      background-size:22px 22px;
-      opacity:0.55;
-      pointer-events:none;
-    }
-    .bgClean::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      background: radial-gradient(560px 240px at 20% 20%, rgba(37,99,235,0.12) 0%, rgba(37,99,235,0) 70%);
-      opacity:0.9;
-      pointer-events:none;
-    }
-    .bgWarm::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      background:
-        radial-gradient(560px 240px at 20% 20%, rgba(251,191,36,0.22) 0%, rgba(251,191,36,0) 70%),
-        radial-gradient(560px 240px at 80% 40%, rgba(236,72,153,0.16) 0%, rgba(236,72,153,0) 70%);
-      opacity:0.95;
-      pointer-events:none;
-    }
-
-    @media (max-width:980px){
-      .cards{grid-template-columns:1fr}
-      .btn{width:100%}
-      .roomInput{width:100%}
-    }
-    @media (max-width:420px){
-      .shell{padding:18px}
-      .langBtn{
-        width:40px;
-        min-width:40px;
-        padding:7px 8px;
-      }
-      .logo{font-size:26px}
-    }
-
-    /* =========================
-       MOBILE FIXED HEADER
-       Only show on mobile, prevent text clipping under it
-       ========================= */
-    .mHeader{ display:none; }
-
-    @media (max-width:768px){
-      /* show fixed header */
-      .mHeader{
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 10px 12px;
-        background: rgba(255,255,255,0.82);
-        backdrop-filter: blur(10px);
-        border-bottom: 1px solid rgba(230,234,242,0.9);
-      }
-
-      .mLogo{
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        padding: 8px 12px;
-        border-radius: 16px;
-        background:
-          radial-gradient(180px 80px at 20% 20%, rgba(37,99,235,0.20) 0%, rgba(37,99,235,0) 70%),
-          radial-gradient(220px 90px at 80% 40%, rgba(168,85,247,0.16) 0%, rgba(168,85,247,0) 70%),
-          rgba(255,255,255,0.72);
-        border: 1px solid rgba(230,234,242,0.9);
-        box-shadow: 0 14px 36px rgba(15,23,42,0.10);
-        user-select: none;
-        white-space: nowrap;
-      }
-      .mLogoMark{
-        width: 18px;
-        height: 18px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
-        box-shadow: 0 10px 24px rgba(37,99,235,0.22);
-        flex: 0 0 auto;
-      }
-      .mLogoText{
-        background: linear-gradient(90deg, #2563eb 0%, #7c3aed 55%, #0ea5e9 100%);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        font-size: 16px;
-        font-weight: 950;
-        letter-spacing: -0.02em;
-      }
-      .mLangSwitch{
-        display: inline-flex;
-        align-items: center;
-        border: 1px solid rgba(11,18,32,0.12);
-        border-radius: 14px;
-        overflow: hidden;
-        background: rgba(251,252,255,0.9);
-        box-shadow: 0 10px 24px rgba(15,23,42,0.06);
-      }
-      .mLangSwitch .langBtn{
-        appearance: none;
-        border: 0;
-        background: transparent;
-        color: rgba(11,18,32,0.62);
-        padding: 8px 10px;
-        min-width: 42px;
-        min-height: 36px;
-        font-weight: 950;
-        font-size: 12px;
-        line-height: 1;
-        cursor: pointer;
-      }
-
-      /* PC 언어 스위치는 모바일에서 숨김 (중복 방지) */
-      .brandTop .langSwitch{
-        display:none !important;
-      }
-
-      /* 헤더 높이만큼 아래로 내리기 (잘림 방지) */
-      body{
-        padding-top: 92px;
-        align-items: flex-start;
-      }
-
-      /* 모바일에서 shell이 위로 붙을 수 있게 */
-      .shell{
-        margin-top: 0;
-      }
-    }
     @media (max-width: 768px) {
-  /* 모바일에서는 상단 고정 헤더(mHeader)에 로고가 있으니,
-     본문 쪽 로고 줄(brandTop)을 통째로 숨겨 중복 제거 */
-  .brandTop {
-    display: none !important;
-  }
-
-  /* brandTop이 사라지면 hero가 바로 위로 붙을 수 있으니 약간의 여백만 준다 */
-  .brand {
-    margin-top: 6px;
-  }
-
-  /* shell 상단이 너무 답답하면 padding 약간 조정 */
-  .shell {
-    padding-top: 18px;
-  }
-}
+      .mHeader { display: flex; }
+      .nav { display: none; }
+      .hero { padding: 80px 0 40px; }
+      .hero h1 { font-size: 2.5rem; }
+      .grid { grid-template-columns: 1fr; gap: 20px; }
+      .brandTop { display: none !important; }
+      .brand { margin-top: 6px; }
+      .shell { padding-top: 18px; }
+    }
   </style>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-Z540JM20NS"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-XXXXXXXXXX');
-</script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XXXXXXXXXX');
+  </script>
 </head>
 <body>
-  <!-- Mobile fixed header for logo and language -->
-  <div class="mHeader" role="banner">
-    <div class="mLogo" aria-label="unline">
-      <span class="mLogoMark" aria-hidden="true"></span>
-      <span class="mLogoText">unline</span>
-    </div>
 
-    <div class="mLangSwitch langSwitch" role="group" aria-label="Language">
-      <button type="button" class="langBtn" data-lang="en" aria-pressed="false">EN</button>
-      <button type="button" class="langBtn" data-lang="ko" aria-pressed="false">KR</button>
-      <button type="button" class="langBtn" data-lang="ja" aria-pressed="false">JP</button>
+  <header class="mHeader">
+    <div class="mLogo" aria-label="unline">unline</div>
+    <div class="lang-switch">
+      <button class="lang-btn" onclick="setLang('ko')">KO</button>
+      <button class="lang-btn" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" onclick="setLang('ja')">JA</button>
     </div>
-  </div>
+  </header>
 
   <div class="shell">
-    <div class="brand">
-      <div class="brandTop">
-        <div class="logo">
-          <span class="logoMark" aria-hidden="true"></span>
-          <span class="logoText">unline</span>
-        </div>
+    <nav class="nav">
+      <div class="brand">unline</div>
+      <div class="lang-switch">
+        <button class="lang-btn" data-l="ko" onclick="setLang('ko')">KO</button>
+        <button class="lang-btn" data-l="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-l="ja" onclick="setLang('ja')">JA</button>
+      </div>
+    </nav>
 
-        <div class="langSwitch" role="group" aria-label="Language">
-          <button type="button" class="langBtn" data-lang="en" aria-pressed="false">EN</button>
-          <button type="button" class="langBtn" data-lang="ko" aria-pressed="false">KR</button>
-          <button type="button" class="langBtn" data-lang="ja" aria-pressed="false">JP</button>
+    <div class="hero">
+      <div class="brandTop" id="brandTop" style="font-weight:800; font-size:1.5rem; margin-bottom:40px;">unline</div>
+      <h1 id="heroTitle">Words fall short, draw it.</h1>
+      <p id="heroDesc">No install, no sign up. Start a visual conversation instantly.</p>
+      
+      <p id="roomNotice"></p>
+
+      <div style="margin-top:40px">
+        <input type="text" id="room" placeholder="Enter room code (optional)" maxlength="20">
+        <div style="margin-top:15px">
+          <button class="btn" id="start">WELCOME</button>
         </div>
       </div>
-
-      <div class="hero" id="heroText"></div>
-      <div class="sub" id="subText"></div>
     </div>
 
-    <div class="entry">
-      <input id="room" class="roomInput" value="WELCOME" />
-      <button id="start" class="btn"></button>
-    </div>
-    <div class="hint" id="hintText"></div>
-
-    <div class="modes">
-      <div class="modesTitle" id="modesTitleText"></div>
-
-      <div class="cards" id="cards">
-        <div class="card bgGrid" data-mode="study" role="button" tabindex="0">
-          <div class="cardTop">
-            <div class="cardName" id="cardStudyName"></div>
-            <div class="chip" id="chipStudy"></div>
-          </div>
-          <div class="cardLine" id="cardStudyLine"></div>
-          <div class="cardDesc" id="cardStudyDesc"></div>
-        </div>
-
-        <div class="card bgClean" data-mode="meeting" role="button" tabindex="0">
-          <div class="cardTop">
-            <div class="cardName" id="cardMeetingName"></div>
-            <div class="chip" id="chipMeeting"></div>
-          </div>
-          <div class="cardLine" id="cardMeetingLine"></div>
-          <div class="cardDesc" id="cardMeetingDesc"></div>
-        </div>
-
-        <div class="card bgWarm" data-mode="free" role="button" tabindex="0">
-          <div class="cardTop">
-            <div class="cardName" id="cardFreeName"></div>
-            <div class="chip" id="chipFree"></div>
-          </div>
-          <div class="cardLine" id="cardFreeLine"></div>
-          <div class="cardDesc" id="cardFreeDesc"></div>
-        </div>
+    <div class="grid">
+      <div class="card">
+        <h3 id="cardDrawTitle">Draw & Write</h3>
+        <p id="cardDrawDesc">Sketch ideas and take notes on a shared infinite canvas.</p>
       </div>
-
-      <div class="smallNote" id="smallNoteText"></div>
+      <div class="card">
+        <h3 id="cardVoiceTitle">Voice Chat</h3>
+        <p id="cardVoiceDesc">Talk in real-time with crystal clear spatial audio.</p>
+      </div>
     </div>
   </div>
 
   <script>
-    const $ = (id) => document.getElementById(id);
+    const $ = id => document.getElementById(id);
 
-    const LANG_KEY = "unline_lang";
-    const MODE_KEY = "unline_mode";
-    const SUPPORTED = new Set(["en","ko","ja"]);
-
-    const I18N = {
+    const MESSAGES = {
       en: {
-        hero: "When words fall short, draw it.",
-        sub: "No install, no sign up.\nStart a visual conversation instantly.",
-        roomPlaceholder: "Enter room name",
-        start: "Start",
-        hint: "Join the same room to share voice and drawing.",
-        modesTitle: "What kind of conversation do you want?",
-        smallNote: "You can start without selecting a mode.",
-
-        chipStudy: "Grid",
-        chipMeeting: "Clean",
-        chipFree: "Warm",
-
-        cardStudyName: "✏️ Study Mode",
-        cardStudyLine: "For concepts that are hard to explain with words",
-        cardStudyDesc: "Best for language practice, problem solving, and concept notes.",
-
-        cardMeetingName: "🧩 Meeting Mode",
-        cardMeetingLine: "For fast idea sharing",
-        cardMeetingDesc: "Best for short meetings, planning sketches, and alignment.",
-
-        cardFreeName: "🎨 Free Mode",
-        cardFreeLine: "A conversation that needs no words",
-        cardFreeDesc: "Best for play, reflection, and emotional expression.",
-
-        ariaStudy: "Select Study Mode",
-        ariaMeeting: "Select Meeting Mode",
-        ariaFree: "Select Free Mode"
+        heroTitle: "Words fall short, draw it.",
+        heroDesc: "No install, no sign up. Start a visual conversation instantly.",
+        roomNotice: "🔒 Room codes are auto-generated; rooms are deleted once everyone leaves.", // 추가
+        start: "WELCOME",
+        placeholder: "Enter room code (optional)",
+        cardDrawTitle: "Draw & Write",
+        cardDrawDesc: "Sketch ideas and take notes on a shared infinite canvas.",
+        cardVoiceTitle: "Voice Chat",
+        cardVoiceDesc: "Talk in real-time with crystal clear spatial audio."
       },
       ko: {
-        hero: "말로는 부족할 때, 바로 그려서 보여주세요.",
-        sub: "설치 없이, 가입 없이.\n링크 하나로 바로 시작하는 시각적 대화.",
-        roomPlaceholder: "방 이름을 입력하세요",
+        heroTitle: "말이 부족할 땐, 그리세요.",
+        heroDesc: "설치도, 가입도 필요 없습니다. 즉석에서 시각적인 대화를 시작하세요.",
+        roomNotice: "🔒 방 코드는 자동으로 생성되며, 모든 인원이 나가면 즉시 파기됩니다.", // 추가
         start: "시작하기",
-        hint: "같은 방 이름으로 접속하면, 목소리와 그림이 바로 이어집니다.",
-        modesTitle: "어떤 대화를 원하시나요?",
-        smallNote: "선택하지 않아도 기본 설정으로 시작됩니다.",
-
-        chipStudy: "격자",
-        chipMeeting: "클린",
-        chipFree: "웜",
-
-        cardStudyName: "✏️ 공부 모드",
-        cardStudyLine: "개념을 말로 설명하기 어려울 때",
-        cardStudyDesc: "언어 연습, 문제 풀이, 개념 정리에 적합합니다.",
-
-        cardMeetingName: "🧩 회의 모드",
-        cardMeetingLine: "아이디어를 빠르게 공유할 때",
-        cardMeetingDesc: "짧은 미팅, 기획 스케치, 방향 정리에 적합합니다.",
-
-        cardFreeName: "🎨 자유 모드",
-        cardFreeLine: "말하지 않아도 괜찮은 대화",
-        cardFreeDesc: "놀이, 상담, 감정 표현에 적합합니다.",
-
-        ariaStudy: "공부 모드 선택",
-        ariaMeeting: "회의 모드 선택",
-        ariaFree: "자유 모드 선택"
+        placeholder: "방 코드 입력 (선택 사항)",
+        cardDrawTitle: "그리기 및 쓰기",
+        cardDrawDesc: "공유된 무한 캔버스에서 아이디어를 스케치하고 메모하세요.",
+        cardVoiceTitle: "음성 채팅",
+        cardVoiceDesc: "선명한 공간 오디오로 실시간 대화를 나누세요."
       },
       ja: {
-        hero: "言葉で足りないとき、描いて伝えてください。",
-        sub: "インストール不要、登録不要。\nリンク一つで始まるビジュアル会話。",
-        roomPlaceholder: "ルーム名を入力",
-        start: "開始",
-        hint: "同じルーム名で入ると、音声と描画が共有されます。",
-        modesTitle: "どんな会話をしますか？",
-        smallNote: "モードを選ばなくても開始できます。",
-
-        chipStudy: "グリッド",
-        chipMeeting: "クリーン",
-        chipFree: "ウォーム",
-
-        cardStudyName: "✏️ 学習モード",
-        cardStudyLine: "言葉で説明しにくい概念のために",
-        cardStudyDesc: "言語練習、問題解決、要点整理に最適です。",
-
-        cardMeetingName: "🧩 会議モード",
-        cardMeetingLine: "アイデアを素早く共有するために",
-        cardMeetingDesc: "短いミーティング、企画スケッチ、方向性確認に最適です。",
-
-        cardFreeName: "🎨 フリーモード",
-        cardFreeLine: "言葉がなくても成立する会話",
-        cardFreeDesc: "遊び、内省、感情表現に最適です。",
-
-        ariaStudy: "学習モードを選択",
-        ariaMeeting: "会議モードを選択",
-        ariaFree: "フリーモードを選択"
+        heroTitle: "言葉で足りない時は、描こう。",
+        heroDesc: "インストールも登録も不要。その場でビジュアルな会話を始めましょう。",
+        roomNotice: "🔒 ルームコードは自動生成され、全員が退室すると即座に削除されます。", // 추가
+        start: "スタート",
+        placeholder: "ルームコード (任意)",
+        cardDrawTitle: "描画と記述",
+        cardDrawDesc: "共有された無限キャンバスでアイデアをスケッチしメモしましょう。",
+        cardVoiceTitle: "ボイスチャット",
+        cardVoiceDesc: "クリアな空間オー디오でリアルタイムに会話しましょう。"
       }
     };
 
-    function getLangFromPath() {
-      const seg = (location.pathname || "/").split("/").filter(Boolean)[0];
-      if (seg && SUPPORTED.has(seg)) return seg;
-      return null;
-    }
-
-    function getStoredLang() {
-      const v = localStorage.getItem(LANG_KEY);
-      if (v && SUPPORTED.has(v)) return v;
-      return null;
-    }
-
-    function setStoredLang(lang) {
-      localStorage.setItem(LANG_KEY, lang);
-    }
-
-    function resolveInitialLang() {
-      return getLangFromPath() || getStoredLang() || "en";
-    }
-
     function applyLang(lang) {
-      const t = I18N[lang] || I18N.en;
+      const m = MESSAGES[lang];
+      $("heroTitle").textContent = m.heroTitle;
+      $("heroDesc").textContent = m.heroDesc;
+      $("roomNotice").textContent = m.roomNotice; // 문구 적용 코드 추가
+      $("start").textContent = m.start;
+      $("room").placeholder = m.placeholder;
+      $("cardDrawTitle").textContent = m.cardDrawTitle;
+      $("cardDrawDesc").textContent = m.cardDrawDesc;
+      $("cardVoiceTitle").textContent = m.cardVoiceTitle;
+      $("cardVoiceDesc").textContent = m.cardVoiceDesc;
 
-      document.documentElement.lang = lang;
-
-      $("heroText").textContent = t.hero;
-      $("subText").textContent = t.sub;
-      $("room").placeholder = t.roomPlaceholder;
-      $("start").textContent = t.start;
-      $("hintText").textContent = t.hint;
-      $("modesTitleText").textContent = t.modesTitle;
-      $("smallNoteText").textContent = t.smallNote;
-
-      $("chipStudy").textContent = t.chipStudy;
-      $("chipMeeting").textContent = t.chipMeeting;
-      $("chipFree").textContent = t.chipFree;
-
-      $("cardStudyName").textContent = t.cardStudyName;
-      $("cardStudyLine").textContent = t.cardStudyLine;
-      $("cardStudyDesc").textContent = t.cardStudyDesc;
-
-      $("cardMeetingName").textContent = t.cardMeetingName;
-      $("cardMeetingLine").textContent = t.cardMeetingLine;
-      $("cardMeetingDesc").textContent = t.cardMeetingDesc;
-
-      $("cardFreeName").textContent = t.cardFreeName;
-      $("cardFreeLine").textContent = t.cardFreeLine;
-      $("cardFreeDesc").textContent = t.cardFreeDesc;
-
-      const studyCard = document.querySelector('.card[data-mode="study"]');
-      const meetingCard = document.querySelector('.card[data-mode="meeting"]');
-      const freeCard = document.querySelector('.card[data-mode="free"]');
-
-      if (studyCard) studyCard.setAttribute("aria-label", t.ariaStudy);
-      if (meetingCard) meetingCard.setAttribute("aria-label", t.ariaMeeting);
-      if (freeCard) freeCard.setAttribute("aria-label", t.ariaFree);
-
-      document.querySelectorAll(".langBtn").forEach(btn => {
-        const isActive = btn.dataset.lang === lang;
-        btn.classList.toggle("isActive", isActive);
-        btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+      document.querySelectorAll('.lang-btn').forEach(b => {
+        b.classList.toggle('active', b.textContent.toLowerCase() === lang);
       });
     }
 
-    let selectedMode = localStorage.getItem(MODE_KEY) || "";
-
-    function applySelected() {
-      const cards = document.querySelectorAll(".card[data-mode]");
-      cards.forEach((c) => {
-        c.classList.toggle("selected", c.dataset.mode === selectedMode);
-      });
-    }
-
-    function selectMode(mode) {
-      selectedMode = mode || "";
-      localStorage.setItem(MODE_KEY, selectedMode);
-      applySelected();
-    }
-
-    function go() {
-      const room = ($("room").value || "WELCOME").trim() || "WELCOME";
-      const clientId = "c" + Math.random().toString(16).slice(2,10);
-      const label = "Member";
-      const modeParam = selectedMode ? `&mode=${encodeURIComponent(selectedMode)}` : "";
-      location.href = `/canvas.html?room=${encodeURIComponent(room)}&clientId=${encodeURIComponent(clientId)}&label=${encodeURIComponent(label)}${modeParam}`;
+    function setLang(lang) {
+      localStorage.setItem('unline_lang', lang);
+      applyLang(lang);
     }
 
     function initLang() {
-      const initial = resolveInitialLang();
-      setStoredLang(initial);
-      applyLang(initial);
-
-      document.querySelectorAll(".langBtn").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const lang = btn.dataset.lang;
-          if (!SUPPORTED.has(lang)) return;
-          setStoredLang(lang);
-          applyLang(lang);
-        });
-      });
+      const saved = localStorage.getItem('unline_lang');
+      const nav = navigator.language.split('-')[0];
+      const lang = saved || (MESSAGES[nav] ? nav : 'en');
+      applyLang(lang);
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      initLang();
+    $("start").onclick = () => {
+      const r = $("room").value.trim();
+      if (r) {
+        window.location.href = "/" + encodeURIComponent(r);
+      } else {
+        const auto = Math.random().toString(36).substring(2, 8);
+        window.location.href = "/" + auto;
+      }
+    };
 
-      $("start").addEventListener("click", go);
-      $("room").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") go();
-      });
+    $("room").onkeypress = e => {
+      if (e.key === 'Enter') $("start").click();
+    };
 
-      $("cards").addEventListener("click", (e) => {
-        const card = e.target.closest(".card[data-mode]");
-        if (!card) return;
-        selectMode(card.dataset.mode);
-      });
-
-      $("cards").addEventListener("keydown", (e) => {
-        if (e.key !== "Enter" && e.key !== " ") return;
-        const card = e.target.closest(".card[data-mode]");
-        if (!card) return;
-        e.preventDefault();
-        selectMode(card.dataset.mode);
-      });
-
-      applySelected();
-    });
+    initLang();
   </script>
 </body>
 </html>
