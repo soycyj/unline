@@ -510,6 +510,20 @@
     z-index: 2;
   }
 }
+    /* People 리스트에서 이름이 글자 단위로 줄바꿈되는 현상 방지 */
+.userName{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* 좌측 영역이 줄어들 때 말줄임표가 동작하도록 */
+.userRow > div:first-child{
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
   </style>
 </head>
 <body>
@@ -846,12 +860,14 @@
         txtWrap.style.gap = "2px";
 
         const name = document.createElement("div");
+        name.className = "userNameLine";
         name.style.fontSize = "13px";
         name.style.fontWeight = "950";
         name.style.color = "var(--text)";
         name.textContent = u.clientId === clientId ? t("you") : (u.label || t("member"));
 
         const roleLine = document.createElement("div");
+        roleLine.className = "userRoleLine";
         roleLine.style.fontSize = "12px";
         roleLine.style.fontWeight = "850";
         roleLine.style.color = "var(--muted)";
