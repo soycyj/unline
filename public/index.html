@@ -435,6 +435,13 @@ margin-top: 0;
     padding-top: 18px;
   }
 }
+.notice{
+  margin-top:10px;
+  font-size:13px;
+  font-weight:800;
+  color:var(--muted);
+  line-height:1.5;
+}
 </style>
 </head>
 <body>
@@ -469,6 +476,8 @@ margin-top: 0;
 
 <div class="hero" id="heroText"></div>
 <div class="sub" id="subText"></div>
+<div class="notice" id="noticeText"></div>
+
 </div>
 
 <div class="entry">
@@ -529,6 +538,8 @@ start: "Start",
 hint: "Join the same room to share voice and drawing.",
 modesTitle: "What kind of conversation do you want?",
 smallNote: "You can start without selecting a mode.",
+notice: "Create your own room code.\nWhen everyone leaves, the room disappears automatically.",
+
 
 chipStudy: "Grid",
 chipMeeting: "Clean",
@@ -558,6 +569,7 @@ start: "시작하기",
 hint: "같은 방 이름으로 접속하면, 목소리와 그림이 바로 이어집니다.",
 modesTitle: "어떤 대화를 원하시나요?",
 smallNote: "선택하지 않아도 기본 설정으로 시작됩니다.",
+notice: "방 코드는 직접 만들 수 있고,\n참여자가 모두 나가면 방은 자동으로 사라집니다.",
 
 chipStudy: "격자",
 chipMeeting: "클린",
@@ -587,6 +599,7 @@ start: "開始",
 hint: "同じルーム名で入ると、音声と描画が共有されます。",
 modesTitle: "どんな会話をしますか？",
 smallNote: "モードを選ばなくても開始できます。",
+notice: "ルームコードは自由に作れます。\n全員が退出すると、ルームは自動的に消えます。",
 
 chipStudy: "グリッド",
 chipMeeting: "クリーン",
@@ -637,6 +650,7 @@ document.documentElement.lang = lang;
 
 $("heroText").textContent = t.hero;
 $("subText").textContent = t.sub;
+$("noticeText").textContent = t.notice;
 $("room").placeholder = t.roomPlaceholder;
 $("start").textContent = t.start;
 $("hintText").textContent = t.hint;
