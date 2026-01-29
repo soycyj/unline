@@ -856,8 +856,10 @@
 
         const txtWrap = document.createElement("div");
         txtWrap.style.display = "flex";
-        txtWrap.style.flexDirection = "column";
-        txtWrap.style.gap = "2px";
+        txtWrap.style.flexDirection = "row"; 
+        txtWrap.style.alignItems = "center";
+        txtWrap.style.gap = "6px";
+        txtWrap.style.minWidth = "0";
 
         const name = document.createElement("div");
         name.className = "userNameLine";
@@ -871,7 +873,8 @@
         roleLine.style.fontSize = "12px";
         roleLine.style.fontWeight = "850";
         roleLine.style.color = "var(--muted)";
-        roleLine.textContent = u.role === "participant" ? t("roleParticipant") : t("roleViewer");
+        roleLine.textContent = "· " + (u.role === "participant" ? t("roleParticipant") : t("roleViewer"));
+
 
         txtWrap.appendChild(name);
         txtWrap.appendChild(roleLine);
