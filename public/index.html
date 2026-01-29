@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>unline</title>
+
   <style>
     :root{
       --bg:#f6f8fb;
@@ -12,7 +13,7 @@
       --text:#0b1220;
       --muted:#5a677f;
       --btn:#2563eb;
-      --shadow: 0 14px 44px rgba(15,23,42,0.10);
+      --shadow:0 14px 44px rgba(15,23,42,0.10);
       --radius:20px;
     }
     *{box-sizing:border-box}
@@ -27,11 +28,13 @@
       color:var(--text);
       font-family:system-ui,-apple-system,Segoe UI,Roboto;
       display:flex;
-      align-items:center;
       justify-content:center;
       padding:22px;
     }
 
+    /* =====================
+       SHELL
+       ===================== */
     .shell{
       width:min(980px,100%);
       background:
@@ -45,6 +48,9 @@
       backdrop-filter: blur(12px);
     }
 
+    /* =====================
+       BRAND
+       ===================== */
     .brand{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
     .brandTop{display:flex;align-items:center;justify-content:space-between;gap:12px}
 
@@ -65,8 +71,10 @@
     }
     .logoText{
       background:linear-gradient(90deg,#2563eb,#7c3aed,#0ea5e9);
-      -webkit-background-clip:text;background-clip:text;color:transparent;
-      font-size:28px;
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+      font-size:26px;
     }
 
     .langSwitch{
@@ -82,6 +90,7 @@
     .hero{font-size:22px;font-weight:950}
     .sub{color:var(--muted);font-size:14px;font-weight:800;white-space:pre-line}
 
+    /* 강조 문구 */
     .notice{
       margin-top:10px;
       font-size:13px;
@@ -90,36 +99,65 @@
       line-height:1.5;
     }
 
+    /* =====================
+       ENTRY
+       ===================== */
     .entry{margin-top:18px;display:flex;gap:12px;flex-wrap:wrap}
     .roomInput{
-      flex:1;padding:18px;border-radius:18px;border:2px solid rgba(37,99,235,.22);
+      flex:1;padding:18px;border-radius:18px;
+      border:2px solid rgba(37,99,235,.22);
       font-size:18px;font-weight:950;
     }
     .btn{
       padding:18px;border-radius:18px;
       background:linear-gradient(180deg,#2f6bff,#1f56e8);
       color:#fff;font-size:18px;font-weight:950;
+      border:none;
     }
+
+    /* =====================
+       MODES
+       ===================== */
+    .modes{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+    .modesTitle{font-size:14px;font-weight:950;margin-bottom:12px}
+
+    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .card{
+      background:#fff;border:1px solid var(--line);
+      border-radius:18px;padding:14px;
+      box-shadow:0 10px 26px rgba(15,23,42,0.06);
+    }
+
+    .cardTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .cardName{font-weight:950;font-size:14px}
+    .chip{font-size:12px;font-weight:950;padding:6px 10px;border-radius:999px;border:1px solid var(--line)}
+    .cardLine{font-size:13px;font-weight:900;color:var(--muted)}
+    .cardDesc{font-size:12px;font-weight:800;color:var(--muted);margin-top:8px}
+
+    /* =====================
+       MOBILE
+       ===================== */
+    .mHeader{display:none}
 
     @media (max-width:768px){
-      body{align-items:flex-start;padding-top:92px}
+      body{padding-top:92px}
       .brandTop{display:none}
-      .shell{padding-top:18px}
-      .mHeader{display:flex}
-    }
-
-    .mHeader{
-      display:none;position:fixed;top:0;left:0;right:0;
-      padding:10px 12px;justify-content:space-between;
-      background:rgba(255,255,255,.82);
-      backdrop-filter:blur(10px);
-      z-index:9999;
+      .mHeader{
+        position:fixed;top:0;left:0;right:0;
+        display:flex;justify-content:space-between;
+        padding:10px 12px;
+        background:rgba(255,255,255,.82);
+        backdrop-filter:blur(10px);
+        z-index:9999;
+      }
+      .cards{grid-template-columns:1fr}
     }
   </style>
 </head>
+
 <body>
 
-<!-- Mobile header -->
+<!-- MOBILE HEADER -->
 <div class="mHeader">
   <div class="logo">
     <span class="logoMark"></span>
@@ -148,14 +186,37 @@
 
     <div class="hero" id="heroText"></div>
     <div class="sub" id="subText"></div>
-
-    <!-- 강조 문구 -->
     <div class="notice" id="noticeText"></div>
   </div>
 
   <div class="entry">
     <input id="room" class="roomInput" value="WELCOME" />
     <button id="start" class="btn"></button>
+  </div>
+
+  <!-- MODES -->
+  <div class="modes">
+    <div class="modesTitle" id="modesTitleText"></div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="cardTop"><div class="cardName" id="studyName"></div><div class="chip">Grid</div></div>
+        <div class="cardLine" id="studyLine"></div>
+        <div class="cardDesc" id="studyDesc"></div>
+      </div>
+
+      <div class="card">
+        <div class="cardTop"><div class="cardName" id="meetingName"></div><div class="chip">Clean</div></div>
+        <div class="cardLine" id="meetingLine"></div>
+        <div class="cardDesc" id="meetingDesc"></div>
+      </div>
+
+      <div class="card">
+        <div class="cardTop"><div class="cardName" id="freeName"></div><div class="chip">Warm</div></div>
+        <div class="cardLine" id="freeLine"></div>
+        <div class="cardDesc" id="freeDesc"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -165,32 +226,76 @@ const I18N={
     hero:"When words fall short, draw it.",
     sub:"No install, no sign up.\nStart a visual conversation instantly.",
     notice:"Create your own room code.\nWhen everyone leaves, the room disappears automatically.",
-    start:"Start"
+    start:"Start",
+    modes:"What kind of conversation do you want?",
+    study:"✏️ Study Mode",
+    studyLine:"For concepts that are hard to explain with words",
+    studyDesc:"Best for language practice, problem solving, and concept notes.",
+    meeting:"🧩 Meeting Mode",
+    meetingLine:"For fast idea sharing",
+    meetingDesc:"Best for short meetings, planning sketches, and alignment.",
+    free:"🎨 Free Mode",
+    freeLine:"A conversation that needs no words",
+    freeDesc:"Best for play, reflection, and emotional expression."
   },
   ko:{
     hero:"말로는 부족할 때, 바로 그려서 보여주세요.",
     sub:"설치 없이, 가입 없이.\n링크 하나로 바로 시작하는 시각적 대화.",
     notice:"방 코드는 직접 만들 수 있고,\n참여자가 모두 나가면 방은 자동으로 사라집니다.",
-    start:"시작하기"
+    start:"시작하기",
+    modes:"어떤 대화를 원하시나요?",
+    study:"✏️ 공부 모드",
+    studyLine:"개념을 말로 설명하기 어려울 때",
+    studyDesc:"언어 연습, 문제 풀이, 개념 정리에 적합합니다.",
+    meeting:"🧩 회의 모드",
+    meetingLine:"아이디어를 빠르게 공유할 때",
+    meetingDesc:"짧은 미팅, 기획 스케치, 방향 정리에 적합합니다.",
+    free:"🎨 자유 모드",
+    freeLine:"말하지 않아도 괜찮은 대화",
+    freeDesc:"놀이, 상담, 감정 표현에 적합합니다."
   },
   ja:{
     hero:"言葉で足りないとき、描いて伝えてください。",
     sub:"インストール不要、登録不要。\nリンク一つで始まるビジュアル会話。",
     notice:"ルームコードは自由に作れます。\n全員が退出すると、ルームは自動的に消えます。",
-    start:"開始"
+    start:"開始",
+    modes:"どんな会話をしますか？",
+    study:"✏️ 学習モード",
+    studyLine:"言葉で説明しにくい概念のために",
+    studyDesc:"言語練習、問題解決、要点整理に最適です。",
+    meeting:"🧩 会議モード",
+    meetingLine:"アイデアを素早く共有するために",
+    meetingDesc:"短いミーティング、企画スケッチ、方向性確認に最適です。",
+    free:"🎨 フリーモード",
+    freeLine:"言葉がなくても成立する会話",
+    freeDesc:"遊び、内省、感情表現に最適です。"
   }
 };
 
-function applyLang(lang){
-  const t=I18N[lang];
+function applyLang(l){
+  const t=I18N[l];
   heroText.textContent=t.hero;
   subText.textContent=t.sub;
   noticeText.textContent=t.notice;
   start.textContent=t.start;
+  modesTitleText.textContent=t.modes;
+
+  studyName.textContent=t.study;
+  studyLine.textContent=t.studyLine;
+  studyDesc.textContent=t.studyDesc;
+
+  meetingName.textContent=t.meeting;
+  meetingLine.textContent=t.meetingLine;
+  meetingDesc.textContent=t.meetingDesc;
+
+  freeName.textContent=t.free;
+  freeLine.textContent=t.freeLine;
+  freeDesc.textContent=t.freeDesc;
+
   document.querySelectorAll(".langBtn").forEach(b=>{
-    b.classList.toggle("isActive",b.dataset.lang===lang);
+    b.classList.toggle("isActive",b.dataset.lang===l);
   });
-  localStorage.setItem("unline_lang",lang);
+  localStorage.setItem("unline_lang",l);
 }
 
 document.querySelectorAll(".langBtn").forEach(b=>{
